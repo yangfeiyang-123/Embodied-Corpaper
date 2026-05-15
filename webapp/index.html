@@ -245,7 +245,7 @@
   /* Dashboard */
   .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 16px;
     margin-bottom: 24px;
   }
@@ -453,7 +453,7 @@
   .form-field input,
   .form-field textarea,
   .form-field select {
-    padding: 8px 12px;
+    padding: 12px 14px;
     border: 1px solid var(--border);
     border-radius: 8px;
     font-size: 13px;
@@ -464,8 +464,25 @@
   .form-field input:focus,
   .form-field textarea:focus,
   .form-field select:focus { border-color: var(--primary); }
-  .form-field textarea { min-height: 80px; resize: vertical; }
+  .form-field input,
+  .form-field select { min-height: 48px; }
+  .form-field textarea { min-height: 136px; resize: vertical; }
   .form-field input[type="number"] { width: 100px; }
+  .markdown-preview {
+    display: none;
+    margin-top: 6px;
+    padding: 12px 14px;
+    border: 1px solid #dbeafe;
+    border-radius: 8px;
+    background: #f8fbff;
+  }
+  .markdown-preview.active { display: block; }
+  .markdown-preview-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--primary);
+    margin-bottom: 6px;
+  }
 
   .score-inputs {
     display: flex;
@@ -1883,7 +1900,6 @@ const app = {
   // ===================== Dashboard =====================
   renderDashboard() {
     const total = this.papers.length;
-    const avgScore = total ? (this.papers.reduce((s,p)=>s+computeScore(p),0)/total).toFixed(2) : '0.00';
     const shared = this.papers.filter(p=>p.shared==='是').length;
     const favCount = this.papers.filter(p=>p.favorite==='是').length;
     const latest = [...this.papers].sort((a,b)=>(b.readDate||'').localeCompare(a.readDate||'')).slice(0,5);
@@ -1895,7 +1911,6 @@ const app = {
         <div class="page-desc">文献阅读数据总览</div>
         <div class="stats-grid">
           <div class="stat-card"><div class="label">文献总数</div><div class="value">${total}</div></div>
-          <div class="stat-card"><div class="label">平均综合评分</div><div class="value">${avgScore}</div></div>
           <div class="stat-card"><div class="label">已分享</div><div class="value">${shared}</div></div>
           <div class="stat-card"><div class="label">我的收藏</div><div class="value" style="color:#f59e0b;">${favCount}</div></div>
           <div class="stat-card"><div class="label">研究方向</div><div class="value">${CATEGORIES.length}</div></div>
@@ -2084,27 +2099,27 @@ const app = {
           ${s('direction','方向','highlight-section')}
           ${s('oneSentence','一句话定位','highlight-section')}
           ${s('task','核心任务','highlight-section')}
-          ${s('motivation','问题与动机')}
-          ${s('dataset','数据集')}
-          ${s('platform','平台')}
-          ${s('signalAnalysis','信号分析处理')}
-          ${s('methodOverview','方法框架：总体架构')}
-          ${s('methodDetails','方法框架：具体细节和意义目的')}
-          ${s('trainFlow','实验设计：训练流程')}
-          ${s('hardware','实验设计：硬件平台')}
-          ${s('baselines','实验设计：Baselines')}
-          ${s('metrics','实验设计：评价指标')}
-          ${s('overallResults','实验结果：总体结果')}
-          ${s('coreEffect','实验结果：核心贡献的效果')}
-          ${s('ablation','实验结果：方法消融')}
-          ${s('inferenceSpeed','实验结果：推理速度')}
-          ${s('innovation1','创新点 1')}
-          ${s('innovation2','创新点 2')}
-          ${s('innovation3','创新点 3')}
-          ${s('innovation4','创新点 4')}
-          ${s('inspirationNote','启发')}
-          ${s('limitations','局限性/待追问')}
-          ${s('newIdeas','可以推出的新研究思路')}
+          ${s('motivation','问题与动机','highlight-section')}
+          ${s('dataset','数据集','highlight-section')}
+          ${s('platform','平台','highlight-section')}
+          ${s('signalAnalysis','信号分析处理','highlight-section')}
+          ${s('methodOverview','方法框架：总体架构','highlight-section')}
+          ${s('methodDetails','方法框架：具体细节和意义目的','highlight-section')}
+          ${s('trainFlow','实验设计：训练流程','highlight-section')}
+          ${s('hardware','实验设计：硬件平台','highlight-section')}
+          ${s('baselines','实验设计：Baselines','highlight-section')}
+          ${s('metrics','实验设计：评价指标','highlight-section')}
+          ${s('overallResults','实验结果：总体结果','highlight-section')}
+          ${s('coreEffect','实验结果：核心贡献的效果','highlight-section')}
+          ${s('ablation','实验结果：方法消融','highlight-section')}
+          ${s('inferenceSpeed','实验结果：推理速度','highlight-section')}
+          ${s('innovation1','创新点 1','highlight-section')}
+          ${s('innovation2','创新点 2','highlight-section')}
+          ${s('innovation3','创新点 3','highlight-section')}
+          ${s('innovation4','创新点 4','highlight-section')}
+          ${s('inspirationNote','启发','highlight-section')}
+          ${s('limitations','局限性/待追问','highlight-section')}
+          ${s('newIdeas','可以推出的新研究思路','highlight-section')}
           ${this.renderMetadataDetail(p)}
           <div id="comments-section">${this.renderCommentsSection(p.id)}</div>
         </div>
@@ -2314,6 +2329,7 @@ const app = {
     document.getElementById('modal').classList.add('open');
     this.initialFormSnapshot = this.getFormSnapshot();
     this.attachFormDirtyTracking();
+    this.refreshMarkdownPreviews();
   },
 
   renderEditorForm(p) {
@@ -2363,11 +2379,11 @@ const app = {
         if (f.type === 'select') {
           input = `<select id="field-${f.key}">${f.options.map(o=>`<option value="${o}" ${p[f.key]===o?'selected':''}>${o}</option>`).join('')}</select>`;
         } else if (f.type === 'textarea') {
-          input = `<textarea id="field-${f.key}" rows="${f.rows || 3}" placeholder="${f.label}...">${val}</textarea>`;
+          input = this.renderMarkdownField(f, val, 'textarea');
         } else if (f.type === 'date') {
           input = `<input type="date" id="field-${f.key}" value="${val}">`;
         } else {
-          input = `<input type="text" id="field-${f.key}" value="${val}" placeholder="${f.label}">`;
+          input = this.renderMarkdownField(f, val, 'input');
         }
         html += `<div class="form-field ${f.full?'full':''}"><label>${f.label}</label>${input}</div>`;
       });
@@ -2388,12 +2404,45 @@ const app = {
       <div class="field-hint">第一项选中的分类会作为主分类；侧边栏统计会把多分类论文计入每个相关方向。</div>
       </div>
       <div class="form-field full"><label>标签</label>
-        <input type="text" id="field-tags" value="${this.escape(getPaperTags(p).join(', '))}" placeholder="例如：tactile, VLA, diffusion policy">
+        <input type="text" id="field-tags" data-markdown-field="tags" value="${this.escape(getPaperTags(p).join(', '))}" placeholder="例如：tactile, VLA, diffusion policy">
+        <div class="markdown-preview" id="preview-tags">
+          <div class="markdown-preview-label">Markdown 预览</div>
+          <div class="markdown-body" id="preview-body-tags"></div>
+        </div>
         <div class="field-hint">用逗号、分号或换行分隔，用于跨分类检索。</div>
       </div>
     </div>`;
 
     return html;
+  },
+
+  renderMarkdownField(field, value, kind) {
+    const preview = `
+      <div class="markdown-preview" id="preview-${field.key}">
+        <div class="markdown-preview-label">Markdown 预览</div>
+        <div class="markdown-body" id="preview-body-${field.key}"></div>
+      </div>
+    `;
+    if (kind === 'textarea') {
+      return `<textarea id="field-${field.key}" data-markdown-field="${field.key}" rows="${field.rows || 5}" placeholder="${field.label}...">${value}</textarea>${preview}`;
+    }
+    return `<input type="text" id="field-${field.key}" data-markdown-field="${field.key}" value="${value}" placeholder="${field.label}">${preview}`;
+  },
+
+  updateMarkdownPreview(fieldKey) {
+    const field = document.getElementById('field-' + fieldKey);
+    const preview = document.getElementById('preview-' + fieldKey);
+    const body = document.getElementById('preview-body-' + fieldKey);
+    if (!field || !preview || !body) return;
+    const value = field.value.trim();
+    preview.classList.toggle('active', Boolean(value));
+    body.innerHTML = value ? renderMarkdown(value) : '';
+  },
+
+  refreshMarkdownPreviews() {
+    document.querySelectorAll('[data-markdown-field]').forEach(el => {
+      this.updateMarkdownPreview(el.dataset.markdownField);
+    });
   },
 
   async identifyMetadata() {
@@ -2486,6 +2535,7 @@ const app = {
       if (!el || !value) continue;
       if (!onlyFillBlank || !el.value.trim()) el.value = value;
     }
+    this.refreshMarkdownPreviews();
   },
 
   async mergeMetadataIntoExisting(index, paperId) {
@@ -2551,8 +2601,14 @@ const app = {
 
   attachFormDirtyTracking() {
     document.querySelectorAll('#modal-body input, #modal-body textarea, #modal-body select').forEach(el => {
-      el.addEventListener('input', () => this.markFormDirty());
-      el.addEventListener('change', () => this.markFormDirty());
+      el.addEventListener('input', () => {
+        if (el.dataset.markdownField) this.updateMarkdownPreview(el.dataset.markdownField);
+        this.markFormDirty();
+      });
+      el.addEventListener('change', () => {
+        if (el.dataset.markdownField) this.updateMarkdownPreview(el.dataset.markdownField);
+        this.markFormDirty();
+      });
     });
   },
 

@@ -458,31 +458,87 @@
     border-radius: 8px;
     font-size: 13px;
     outline: none;
-    transition: border-color 0.2s;
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
     font-family: inherit;
+    background: #fff;
   }
   .form-field input:focus,
   .form-field textarea:focus,
-  .form-field select:focus { border-color: var(--primary); }
+  .form-field select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+  }
   .form-field input,
   .form-field select { min-height: 48px; }
   .form-field textarea { min-height: 136px; resize: vertical; }
   .form-field input[type="number"] { width: 100px; }
-  .markdown-preview {
-    display: none;
-    margin-top: 6px;
-    padding: 12px 14px;
-    border: 1px solid #dbeafe;
-    border-radius: 8px;
-    background: #f8fbff;
+  .markdown-field {
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: linear-gradient(180deg, #fff 0%, #fbfdff 100%);
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+    overflow: hidden;
   }
-  .markdown-preview.active { display: block; }
-  .markdown-preview-label {
+  .markdown-field:focus-within {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+    background: #fff;
+  }
+  .markdown-field .markdown-source {
+    width: 100%;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+    padding: 14px 70px 14px 14px;
+    line-height: 1.55;
+  }
+  .markdown-field .markdown-source:focus { box-shadow: none; }
+  .markdown-field.input .markdown-source { min-height: 50px; }
+  .markdown-field.textarea .markdown-source {
+    display: block;
+    min-height: 148px;
+    resize: vertical;
+  }
+  .markdown-renderer {
+    display: none;
+    min-height: 50px;
+    padding: 14px 70px 14px 14px;
+    color: var(--text-primary);
+    line-height: 1.65;
+    background: #fff;
+  }
+  .markdown-field.textarea .markdown-renderer { min-height: 148px; }
+  .markdown-field.previewing .markdown-source { display: none; }
+  .markdown-field.previewing .markdown-renderer { display: block; }
+  .markdown-mode-toggle {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 2;
+    border: 1px solid #bfdbfe;
+    border-radius: 999px;
+    background: #eff6ff;
+    color: var(--primary);
     font-size: 11px;
     font-weight: 600;
-    color: var(--primary);
-    margin-bottom: 6px;
+    line-height: 1;
+    padding: 6px 9px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.2s, border-color 0.2s;
   }
+  .markdown-mode-toggle:hover {
+    background: #dbeafe;
+    border-color: #93c5fd;
+    transform: translateY(-1px);
+  }
+  .markdown-field.previewing .markdown-mode-toggle {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+  }
+  .markdown-empty { color: var(--text-muted); }
 
   .score-inputs {
     display: flex;
@@ -2404,11 +2460,7 @@ const app = {
       <div class="field-hint">第一项选中的分类会作为主分类；侧边栏统计会把多分类论文计入每个相关方向。</div>
       </div>
       <div class="form-field full"><label>标签</label>
-        <input type="text" id="field-tags" data-markdown-field="tags" value="${this.escape(getPaperTags(p).join(', '))}" placeholder="例如：tactile, VLA, diffusion policy">
-        <div class="markdown-preview" id="preview-tags">
-          <div class="markdown-preview-label">Markdown 预览</div>
-          <div class="markdown-body" id="preview-body-tags"></div>
-        </div>
+        ${this.renderMarkdownField({ key: 'tags', label: '标签' }, this.escape(getPaperTags(p).join(', ')), 'input')}
         <div class="field-hint">用逗号、分号或换行分隔，用于跨分类检索。</div>
       </div>
     </div>`;
@@ -2417,32 +2469,43 @@ const app = {
   },
 
   renderMarkdownField(field, value, kind) {
-    const preview = `
-      <div class="markdown-preview" id="preview-${field.key}">
-        <div class="markdown-preview-label">Markdown 预览</div>
-        <div class="markdown-body" id="preview-body-${field.key}"></div>
-      </div>
-    `;
+    const modeLabel = '<button class="markdown-mode-toggle" type="button" onclick="app.toggleMarkdownMode(\'' + field.key + '\', event)">预览</button>';
+    const rendered = `<div class="markdown-renderer markdown-body" id="markdown-render-${field.key}" onclick="app.toggleMarkdownMode('${field.key}', event)"></div>`;
     if (kind === 'textarea') {
-      return `<textarea id="field-${field.key}" data-markdown-field="${field.key}" rows="${field.rows || 5}" placeholder="${field.label}...">${value}</textarea>${preview}`;
+      return `<div class="markdown-field textarea" id="markdown-field-${field.key}"><textarea id="field-${field.key}" class="markdown-source" data-markdown-field="${field.key}" rows="${field.rows || 5}" placeholder="${field.label}...">${value}</textarea>${rendered}${modeLabel}</div>`;
     }
-    return `<input type="text" id="field-${field.key}" data-markdown-field="${field.key}" value="${value}" placeholder="${field.label}">${preview}`;
+    return `<div class="markdown-field input" id="markdown-field-${field.key}"><input type="text" id="field-${field.key}" class="markdown-source" data-markdown-field="${field.key}" value="${value}" placeholder="${field.label}">${rendered}${modeLabel}</div>`;
   },
 
   updateMarkdownPreview(fieldKey) {
     const field = document.getElementById('field-' + fieldKey);
-    const preview = document.getElementById('preview-' + fieldKey);
-    const body = document.getElementById('preview-body-' + fieldKey);
-    if (!field || !preview || !body) return;
+    const body = document.getElementById('markdown-render-' + fieldKey);
+    if (!field || !body) return;
     const value = field.value.trim();
-    preview.classList.toggle('active', Boolean(value));
-    body.innerHTML = value ? renderMarkdown(value) : '';
+    body.innerHTML = value ? renderMarkdown(value) : '<span class="markdown-empty">空白</span>';
   },
 
   refreshMarkdownPreviews() {
     document.querySelectorAll('[data-markdown-field]').forEach(el => {
       this.updateMarkdownPreview(el.dataset.markdownField);
     });
+  },
+
+  toggleMarkdownMode(fieldKey, event) {
+    if (event?.target?.closest?.('a')) return;
+    if (event) event.preventDefault();
+    const shell = document.getElementById('markdown-field-' + fieldKey);
+    const field = document.getElementById('field-' + fieldKey);
+    if (!shell || !field) return;
+    const nextPreview = !shell.classList.contains('previewing');
+    this.updateMarkdownPreview(fieldKey);
+    shell.classList.toggle('previewing', nextPreview);
+    const btn = shell.querySelector('.markdown-mode-toggle');
+    if (btn) {
+      btn.textContent = nextPreview ? '编辑' : '预览';
+      btn.setAttribute('aria-pressed', String(nextPreview));
+    }
+    if (!nextPreview) setTimeout(() => field.focus(), 0);
   },
 
   async identifyMetadata() {

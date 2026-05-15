@@ -1,0 +1,19 @@
+{
+  "name": "embodied-papers-team",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --persist-to=.wrangler/state",
+    "deploy": "wrangler deploy",
+    "test": "node --test",
+    "d1:create": "wrangler d1 create embodied-papers-db",
+    "d1:migrate:local": "wrangler d1 migrations apply embodied-papers-db --local",
+    "d1:migrate:remote": "wrangler d1 migrations apply embodied-papers-db --remote",
+    "d1:list": "wrangler d1 migrations list embodied-papers-db --remote",
+    "d1:query:remote": "wrangler d1 execute embodied-papers-db --remote --command=\"SELECT COUNT(*) AS count FROM papers\""
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

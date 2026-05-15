@@ -6,6 +6,7 @@
 <title>具身智能文献深读记录系统</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%233b82f6'/%3E%3Cpath d='M25 30 h22 v40 h-22 a5 5 0 0 1 -5 -5 v-30 a5 5 0 0 1 5 -5 z' fill='white' opacity='0.9'/%3E%3Cpath d='M53 30 h22 a5 5 0 0 1 5 5 v30 a5 5 0 0 1 -5 5 h-22 z' fill='white' opacity='0.6'/%3E%3C/svg%3E">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
   :root {
     --bg: #f5f6fa;
@@ -620,7 +621,6 @@
     font-size: 13px;
     line-height: 1.7;
     margin-top: 6px;
-    white-space: pre-wrap;
   }
   .save-status {
     margin-right: auto;
@@ -751,21 +751,62 @@
     margin-bottom: 20px;
   }
   .detail-section h4 {
-    font-size: 12px;
+    font-size: 13px;
     text-transform: uppercase;
     color: var(--text-secondary);
     letter-spacing: 0.5px;
     margin-bottom: 8px;
     font-weight: 600;
   }
+  .detail-section.highlight-section {
+    background: #f8fafc;
+    border-radius: 10px;
+    padding: 14px 16px;
+    border: 1px solid #e2e8f0;
+  }
+  .detail-section.highlight-section h4 {
+    font-size: 15px;
+    color: var(--primary);
+    border-left: 3px solid var(--primary);
+    padding-left: 10px;
+    text-transform: none;
+    letter-spacing: 0;
+    margin-bottom: 10px;
+  }
   .detail-section p, .detail-section li {
     font-size: 13px;
     line-height: 1.7;
     color: var(--text);
-    white-space: pre-wrap;
   }
   .detail-section ul { padding-left: 18px; }
   .detail-section ul li { margin-bottom: 4px; }
+
+  /* ===== Markdown Body ===== */
+  .markdown-body { font-size: 13px; line-height: 1.8; color: var(--text); }
+  .markdown-body p { margin: 0 0 8px 0; }
+  .markdown-body p:last-child { margin-bottom: 0; }
+  .markdown-body ul, .markdown-body ol { padding-left: 20px; margin: 6px 0; }
+  .markdown-body li { margin-bottom: 4px; }
+  .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 { 
+    font-size: 14px; margin: 10px 0 6px; color: var(--text); font-weight: 600; 
+  }
+  .markdown-body code {
+    background: #f1f5f9; padding: 2px 5px; border-radius: 4px;
+    font-size: 12px; font-family: ui-monospace, SFMono-Regular, monospace;
+  }
+  .markdown-body pre {
+    background: #f8fafc; padding: 10px; border-radius: 8px;
+    overflow-x: auto; font-size: 12px;
+    border: 1px solid var(--border);
+  }
+  .markdown-body blockquote {
+    border-left: 3px solid var(--primary);
+    margin: 6px 0; padding-left: 10px;
+    color: var(--text-secondary);
+  }
+  .markdown-body a { color: var(--primary); }
+  .markdown-body strong { color: var(--text); font-weight: 600; }
+  .markdown-body img { max-width: 100%; border-radius: 8px; }
 
   .link-btn {
     display: inline-flex;
@@ -1130,6 +1171,42 @@
 </div>
 
 <script>
+// ===================== Markdown Renderer =====================
+function renderMarkdown(text) {
+  if (!text) return '';
+  try {
+    const raw = marked.parse(String(text), { breaks: true, headerIds: false, gfm: true });
+    return simpleSanitize(raw);
+  } catch (e) {
+    return escapeHtml(String(text)).replace(/\n/g, '<br>');
+  }
+}
+function renderMarkdownInline(text) {
+  if (!text) return '';
+  try {
+    const raw = marked.parseInline(String(text), { gfm: true });
+    return simpleSanitize(raw);
+  } catch (e) {
+    return escapeHtml(String(text));
+  }
+}
+function simpleSanitize(html) {
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  div.querySelectorAll('script, iframe, object, embed, form, input, button, style').forEach(el => el.remove());
+  div.querySelectorAll('*').forEach(el => {
+    ['onerror','onload','onclick','onmouseover','onmouseenter','onmouseleave'].forEach(attr => el.removeAttribute(attr));
+  });
+  return div.innerHTML;
+}
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
 // ===================== Data & Config =====================
 const DEFAULT_CATEGORIES = [
@@ -1217,17 +1294,17 @@ const FIELDS_DEF = [
   { key: 'status', label: '阅读状态', section: 'basic', type: 'select', options: STATUS_OPTIONS },
   { key: 'shared', label: '是否分享', section: 'basic', type: 'select', options: ['是','否'] },
   { key: 'title', label: '论文标题', section: 'paper', type: 'text', full: true },
-  { key: 'source', label: '年份/来源', section: 'paper', type: 'text' },
+  { key: 'source', label: '年份/来源', section: 'paper', type: 'text', full: true },
   { key: 'link', label: '链接/项目页', section: 'paper', type: 'text', full: true },
-  { key: 'direction', label: '方向', section: 'paper', type: 'textarea' },
-  { key: 'oneSentence', label: '一句话定位', section: 'paper', type: 'textarea', full: true },
-  { key: 'authors', label: '作者与机构', section: 'paper', type: 'textarea' },
+  { key: 'direction', label: '方向', section: 'paper', type: 'textarea', full: true, rows: 4 },
+  { key: 'oneSentence', label: '一句话定位', section: 'paper', type: 'textarea', full: true, rows: 3 },
+  { key: 'authors', label: '作者与机构', section: 'paper', type: 'textarea', full: true, rows: 4 },
   { key: 'abstract', label: '摘要', section: 'metadata', type: 'textarea', full: true },
   { key: 'doi', label: 'DOI', section: 'metadata', type: 'text' },
   { key: 'arxiv_id', label: 'arXiv ID', section: 'metadata', type: 'text' },
   { key: 'openreview_id', label: 'OpenReview ID', section: 'metadata', type: 'text' },
   { key: 'canonical_url', label: '规范链接', section: 'metadata', type: 'text', full: true },
-  { key: 'task', label: '核心任务', section: 'content', type: 'textarea' },
+  { key: 'task', label: '核心任务', section: 'content', type: 'textarea', full: true, rows: 4 },
   { key: 'motivation', label: '问题与动机', section: 'content', type: 'textarea', full: true },
   { key: 'dataset', label: '数据集', section: 'content', type: 'textarea', full: true },
   { key: 'platform', label: '平台', section: 'content', type: 'textarea', full: true },
@@ -1862,7 +1939,7 @@ const app = {
           <span class="tag gray">${this.escape(p.status || '深读中')}</span>
           <span class="tag green">${p.readDate||''}</span>
         </div>
-        <div class="card-summary">${this.escape(p.oneSentence) || '暂无一句话定位'}</div>
+        <div class="card-summary">${renderMarkdownInline(p.oneSentence) || '暂无一句话定位'}</div>
         <div class="card-footer">
           <span class="card-footer-meta">
             <span class="actor-badge">${this.escape(p.updated_by || p.recorder || '未记录')}</span>
@@ -1941,7 +2018,7 @@ const app = {
           ${p.shared==='是' ? '<span class="tag orange">已分享</span>' : ''}
           ${tags.slice(0,2).map(t=>`<span class="tag gray">#${this.escape(t)}</span>`).join('')}
         </div>
-        <div class="card-summary">${this.escape(p.oneSentence) || '暂无一句话定位'}</div>
+        <div class="card-summary">${renderMarkdownInline(p.oneSentence) || '暂无一句话定位'}</div>
         <div class="card-footer">
           <span class="card-footer-meta">
             <span class="actor-badge">${this.escape(p.updated_by || p.recorder || '匿名')}</span>
@@ -1978,7 +2055,7 @@ const app = {
     const score = computeScore(p);
     const categories = getPaperCategories(p);
     const tags = getPaperTags(p);
-    const s = (key, label) => p[key] ? `<div class="detail-section"><h4>${label}</h4><p>${this.nl2br(this.escape(p[key]))}</p></div>` : '';
+    const s = (key, label, extraClass = '') => p[key] ? `<div class="detail-section ${extraClass}"><h4>${label}</h4><div class="markdown-body">${renderMarkdown(p[key])}</div></div>` : '';
     return `
       <div class="detail-meta-grid">
         <div>
@@ -2004,9 +2081,9 @@ const app = {
               <strong>作者/机构：</strong>${this.escape(p.authors)||'-'}
             </p>
           </div>
-          ${s('direction','方向')}
-          ${s('oneSentence','一句话定位')}
-          ${s('task','核心任务')}
+          ${s('direction','方向','highlight-section')}
+          ${s('oneSentence','一句话定位','highlight-section')}
+          ${s('task','核心任务','highlight-section')}
           ${s('motivation','问题与动机')}
           ${s('dataset','数据集')}
           ${s('platform','平台')}
@@ -2070,7 +2147,7 @@ const app = {
         ${fields.length ? `<div class="metadata-grid">
           ${fields.map(([key,label])=>`<div><strong>${label}</strong><br>${this.escape(key.endsWith('_at') ? this.formatChinaTime(p[key]) : p[key])}</div>`).join('')}
         </div>` : ''}
-        ${p.abstract ? `<p style="margin-top:10px;">${this.nl2br(this.escape(p.abstract))}</p>` : ''}
+        ${p.abstract ? `<div class="markdown-body" style="margin-top:10px;">${renderMarkdown(p.abstract)}</div>` : ''}
       </div>
     `;
   },
@@ -2111,7 +2188,7 @@ const app = {
           · ${this.escape(comment.type || '其他')}
           · ${this.formatChinaTime(comment.created_at)}
         </div>
-        <div class="comment-content">${this.nl2br(this.escape(comment.content))}</div>
+        <div class="comment-content markdown-body">${renderMarkdown(comment.content)}</div>
         <div class="comment-actions">
           <button class="btn btn-secondary btn-sm" onclick="app.showReplyForm('${comment.id}')">回复</button>
           <button class="btn btn-secondary btn-sm" onclick="app.removeComment('${paperId}', '${comment.id}')">删除</button>
@@ -2286,7 +2363,7 @@ const app = {
         if (f.type === 'select') {
           input = `<select id="field-${f.key}">${f.options.map(o=>`<option value="${o}" ${p[f.key]===o?'selected':''}>${o}</option>`).join('')}</select>`;
         } else if (f.type === 'textarea') {
-          input = `<textarea id="field-${f.key}" rows="3" placeholder="${f.label}...">${val}</textarea>`;
+          input = `<textarea id="field-${f.key}" rows="${f.rows || 3}" placeholder="${f.label}...">${val}</textarea>`;
         } else if (f.type === 'date') {
           input = `<input type="date" id="field-${f.key}" value="${val}">`;
         } else {

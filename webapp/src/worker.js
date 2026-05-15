@@ -14,7 +14,7 @@ import { detectDuplicate, searchMetadata } from './metadata.js';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, X-App-Password'
+  'Access-Control-Allow-Headers': 'Content-Type, X-App-Password, X-User-Name'
 };
 
 export default {
@@ -47,8 +47,16 @@ async function handleApi(request, env, url) {
       return searchMetadataEndpoint(request, env);
     }
 
+    if (request.method === 'POST' && url.pathname === '/api/auth/register') {
+      return registerUser(request, env);
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/auth/login') {
+      return loginUser(request, env);
+    }
+
     if (request.method === 'GET' && url.pathname === '/api/papers') {
-      return listPapers(env);
+      return listPapers(request, env);
     }
 
     if (request.method === 'POST' && url.pathname === '/api/papers') {
@@ -57,6 +65,12 @@ async function handleApi(request, env, url) {
 
     const paperMatch = url.pathname.match(/^\/api\/papers\/([^/]+)$/);
     const paperId = paperMatch ? decodePathSegment(paperMatch[1]) : null;
+
+    const favMatch = url.pathname.match(/^\/api\/papers\/([^/]+)\/favorite$/);
+    const favPaperId = favMatch ? decodePathSegment(favMatch[1]) : null;
+    if (favMatch && request.method === 'POST') {
+      return toggleFavorite(request, env, favPaperId);
+    }
 
     const commentsMatch = url.pathname.match(/^\/api\/papers\/([^/]+)\/comments$/);
     const commentsPaperId = commentsMatch ? decodePathSegment(commentsMatch[1]) : null;
@@ -104,9 +118,26 @@ function isAuthorized(request, env) {
   return request.headers.get('X-App-Password') === env.APP_PASSWORD;
 }
 
-async function listPapers(env) {
+async function listPapers(request, env) {
   const result = await env.DB.prepare('SELECT * FROM papers ORDER BY updated_at DESC').all();
-  return json({ papers: normalizeRows(result.results) });
+  const papers = normalizeRows(result.results);
+  const username = request.headers.get('X-User-Name') || '';
+  if (username && papers.length) {
+    const paperIds = papers.map((p) => p.id);
+    const placeholders = paperIds.map(() => '?').join(', ');
+    const favRows = await env.DB.prepare(
+      `SELECT paper_id FROM favorites WHERE user_id = ? AND paper_id IN (${placeholders})`
+    ).bind(username, ...paperIds).all();
+    const favSet = new Set((favRows.results || []).map((r) => r.paper_id));
+    for (const p of papers) {
+      p.favorite = favSet.has(p.id) ? '是' : '否';
+    }
+  } else {
+    for (const p of papers) {
+      p.favorite = '否';
+    }
+  }
+  return json({ papers });
 }
 
 async function searchMetadataEndpoint(request, env) {
@@ -186,8 +217,77 @@ async function updatePaper(request, env, id) {
 
 async function deletePaper(env, id) {
   await env.DB.prepare('DELETE FROM comments WHERE paper_id = ?').bind(id).run();
+  await env.DB.prepare('DELETE FROM favorites WHERE paper_id = ?').bind(id).run();
   await env.DB.prepare('DELETE FROM papers WHERE id = ?').bind(id).run();
   return json({ success: true });
+}
+
+async function hashPassword(password) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function registerUser(request, env) {
+  const data = await readJson(request);
+  const username = String(data.username || '').trim();
+  const password = String(data.password || '').trim();
+  if (!username || !password) {
+    return json({ error: 'Username and password are required' }, 400);
+  }
+  if (username.length < 2 || username.length > 32) {
+    return json({ error: 'Username must be 2-32 characters' }, 400);
+  }
+  if (password.length < 4) {
+    return json({ error: 'Password must be at least 4 characters' }, 400);
+  }
+  const existing = await env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(username).first();
+  if (existing) {
+    return json({ error: 'Username already exists' }, 409);
+  }
+  const userId = crypto.randomUUID();
+  const now = new Date().toISOString();
+  await env.DB.prepare(
+    'INSERT INTO users (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)'
+  ).bind(userId, username, await hashPassword(password), now).run();
+  return json({ username }, 201);
+}
+
+async function loginUser(request, env) {
+  const data = await readJson(request);
+  const username = String(data.username || '').trim();
+  const password = String(data.password || '').trim();
+  if (!username || !password) {
+    return json({ error: 'Username and password are required' }, 400);
+  }
+  const row = await env.DB.prepare('SELECT username, password_hash FROM users WHERE username = ?').bind(username).first();
+  if (!row || row.password_hash !== await hashPassword(password)) {
+    return json({ error: 'Invalid username or password' }, 401);
+  }
+  return json({ username });
+}
+
+async function toggleFavorite(request, env, paperId) {
+  const data = await readJson(request);
+  const username = request.headers.get('X-User-Name') || '';
+  if (!username) {
+    return json({ error: 'Login required' }, 401);
+  }
+  const favorite = data.favorite === true;
+  const exists = await env.DB.prepare('SELECT 1 FROM papers WHERE id = ?').bind(paperId).first();
+  if (!exists) {
+    return json({ error: 'Not found' }, 404);
+  }
+  if (favorite) {
+    await env.DB.prepare(
+      'INSERT OR IGNORE INTO favorites (user_id, paper_id, created_at) VALUES (?, ?, ?)'
+    ).bind(username, paperId, new Date().toISOString()).run();
+  } else {
+    await env.DB.prepare('DELETE FROM favorites WHERE user_id = ? AND paper_id = ?').bind(username, paperId).run();
+  }
+  return json({ favorite: favorite ? '是' : '否' });
 }
 
 async function importPapers(request, env) {

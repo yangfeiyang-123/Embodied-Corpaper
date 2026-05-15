@@ -8,6 +8,7 @@ export const FIELDS = [
   'recorder',
   'readDate',
   'shared',
+  'favorite',
   'relevance',
   'novelty',
   'evidence',

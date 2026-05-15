@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>具身智能文献深读记录系统</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%233b82f6'/%3E%3Cpath d='M25 30 h22 v40 h-22 a5 5 0 0 1 -5 -5 v-30 a5 5 0 0 1 5 -5 z' fill='white' opacity='0.9'/%3E%3Cpath d='M53 30 h22 a5 5 0 0 1 5 5 v30 a5 5 0 0 1 -5 5 h-22 z' fill='white' opacity='0.6'/%3E%3C/svg%3E">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
   :root {
@@ -860,6 +861,148 @@
       max-height: none;
     }
   }
+
+  /* ===== Logo ===== */
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .logo-icon {
+    width: 32px; height: 32px; background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    border-radius: 8px; display: inline-flex; align-items: center; justify-content: center;
+    color: white; font-size: 16px; font-weight: 700; flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(59,130,246,0.35);
+  }
+  .app.sidebar-collapsed .brand { justify-content: center; }
+
+  /* ===== Modal Animation ===== */
+  .modal-overlay {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+    display: flex;
+  }
+  .modal-overlay.open {
+    opacity: 1;
+    visibility: visible;
+  }
+  .modal {
+    transform: scale(0.96) translateY(12px);
+    opacity: 0;
+    transition: transform 0.3s cubic-bezier(.22,1,.36,1), opacity 0.3s ease;
+  }
+  .modal-overlay.open .modal {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+
+  /* ===== Page Transition ===== */
+  @keyframes pageEnter {
+    from { opacity: 0; transform: translateX(14px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  .page-enter { animation: pageEnter 0.35s cubic-bezier(.22,1,.36,1); }
+
+  /* ===== Score Number Animation ===== */
+  .score-display {
+    transition: color 0.2s ease, transform 0.2s ease;
+  }
+  .score-display.pop {
+    transform: scale(1.25);
+    color: var(--primary-hover);
+  }
+
+  /* ===== Favorite ===== */
+  .favorite-btn {
+    background: none; border: none; cursor: pointer; padding: 4px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: #cbd5e1; transition: color 0.2s ease, transform 0.2s ease;
+    border-radius: 6px; line-height: 1;
+  }
+  .favorite-btn:hover { color: #f59e0b; transform: scale(1.2); }
+  .favorite-btn.on { color: #f59e0b; }
+  .favorite-btn.on:hover { color: #d97706; }
+  .card-favorite {
+    position: absolute; top: 14px; right: 14px; z-index: 2;
+  }
+  .paper-card .card-favorite .favorite-btn { color: #e2e8f0; }
+  .paper-card .card-favorite .favorite-btn:hover { color: #f59e0b; }
+  .paper-card .card-favorite .favorite-btn.on { color: #f59e0b; }
+
+  /* ===== Confirm Dialog ===== */
+  .confirm-overlay {
+    position: fixed; inset: 0; z-index: 250;
+    background: rgba(0,0,0,0.45);
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; visibility: hidden;
+    transition: opacity 0.25s ease, visibility 0.25s ease;
+  }
+  .confirm-overlay.open {
+    opacity: 1; visibility: visible;
+  }
+  .confirm-card {
+    background: var(--card-bg); border-radius: var(--radius);
+    width: 100%; max-width: 420px; padding: 28px;
+    box-shadow: var(--shadow-lg);
+    transform: scale(0.96) translateY(8px);
+    transition: transform 0.25s cubic-bezier(.22,1,.36,1);
+  }
+  .confirm-overlay.open .confirm-card {
+    transform: scale(1) translateY(0);
+  }
+  .confirm-title {
+    font-size: 16px; font-weight: 600; color: var(--text);
+    margin-bottom: 8px; display: flex; align-items: center; gap: 8px;
+  }
+  .confirm-body {
+    font-size: 14px; color: var(--text-secondary); line-height: 1.6;
+    margin-bottom: 20px;
+  }
+  .confirm-body strong { color: var(--text); }
+  .confirm-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+  /* ===== Login ===== */
+  .login-overlay {
+    position: fixed; inset: 0; z-index: 300;
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    display: flex; align-items: center; justify-content: center;
+    animation: fadeIn 0.4s ease;
+  }
+  .login-overlay.hidden { display: none; }
+  .login-card {
+    background: var(--card-bg); border-radius: var(--radius);
+    padding: 40px; width: 100%; max-width: 400px;
+    box-shadow: var(--shadow-lg);
+  }
+  .login-logo { text-align: center; margin-bottom: 24px; }
+  .login-logo .logo-icon { margin: 0 auto 12px; width: 48px; height: 48px; font-size: 24px; }
+  .login-logo h1 { font-size: 18px; color: var(--text); }
+  .login-logo p { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+  .login-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+  .login-tab {
+    flex: 1; padding: 10px; border: none; background: #f1f5f9;
+    border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500;
+    transition: background 0.15s ease;
+  }
+  .login-tab.active { background: var(--primary); color: white; }
+  .login-form { display: flex; flex-direction: column; gap: 12px; }
+  .login-form input {
+    padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px;
+    font-size: 14px; outline: none; transition: border-color 0.2s;
+    font-family: inherit;
+  }
+  .login-form input:focus { border-color: var(--primary); }
+  .login-error { color: var(--danger); font-size: 13px; text-align: center; }
+  .user-menu {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 8px; background: var(--bg);
+    border: 1px solid var(--border); font-size: 13px; cursor: pointer;
+    color: var(--text); font-weight: 500;
+  }
+  .user-menu:hover { background: var(--border); }
+  .user-avatar {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    color: white; font-size: 11px; font-weight: 700;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
 </style>
 </head>
 <body>
@@ -868,8 +1011,13 @@
   <aside class="sidebar">
     <div class="sidebar-header">
       <button class="sidebar-toggle" onclick="app.toggleSidebar()" title="收起/展开侧边栏">‹</button>
-      <h1>具身智能文献<br>深读记录系统</h1>
-      <p>Embodied Intelligence Paper Tracker</p>
+      <div class="brand">
+        <div class="logo-icon">E</div>
+        <div>
+          <h1>具身智能文献<br>深读记录系统</h1>
+          <p>Embodied Intelligence Paper Tracker</p>
+        </div>
+      </div>
     </div>
     <nav class="nav-section" id="sidebar-nav"></nav>
   </aside>
@@ -899,10 +1047,10 @@
         导入
       </button>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="app.importData(this)">
-      <button class="btn btn-secondary" onclick="app.setMemberName()">
-        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21a8 8 0 10-16 0"/><circle cx="12" cy="7" r="4"/></svg>
-        <span id="member-label">成员</span>
-      </button>
+      <div class="user-menu" id="user-menu" onclick="app.showUserDropdown()" style="display:none;">
+        <span class="user-avatar" id="user-avatar">?</span>
+        <span id="user-name">未登录</span>
+      </div>
       <button class="btn btn-primary" onclick="app.openEditor()">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         新增文献
@@ -913,6 +1061,55 @@
       <!-- Content injected by JS -->
     </div>
   </main>
+</div>
+
+<!-- Login Overlay -->
+<div class="login-overlay hidden" id="login-overlay">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="logo-icon">E</div>
+      <h1>具身智能文献深读记录系统</h1>
+      <p>团队文献阅读与协作平台</p>
+    </div>
+    <div class="login-tabs">
+      <button class="login-tab active" id="tab-login" onclick="app.switchLoginTab('login')">登录</button>
+      <button class="login-tab" id="tab-register" onclick="app.switchLoginTab('register')">注册</button>
+    </div>
+    <div class="login-form" id="login-form-panel">
+      <input type="text" id="login-username" placeholder="用户名" autocomplete="username">
+      <input type="password" id="login-password" placeholder="密码" autocomplete="current-password">
+      <input type="password" id="login-app-password" placeholder="团队访问密码（如已设置）" style="background:#f8fafc;">
+      <div style="font-size:11px;color:var(--text-secondary);line-height:1.5;">如果系统启用了团队密码保护，请向管理员索取访问密码。</div>
+      <div class="login-error" id="login-error"></div>
+      <button class="btn btn-primary" onclick="app.doLogin()" style="width:100%;">登录</button>
+    </div>
+    <div class="login-form" id="register-form-panel" style="display:none;">
+      <input type="text" id="register-username" placeholder="用户名（2-32位）" autocomplete="username">
+      <input type="password" id="register-password" placeholder="密码（至少4位）" autocomplete="new-password">
+      <input type="password" id="register-password2" placeholder="确认密码" autocomplete="new-password">
+      <input type="password" id="register-app-password" placeholder="团队访问密码（如已设置）" style="background:#f8fafc;">
+      <div style="font-size:11px;color:var(--text-secondary);line-height:1.5;">如果系统启用了团队密码保护，请向管理员索取访问密码。</div>
+      <div class="login-error" id="register-error"></div>
+      <button class="btn btn-primary" onclick="app.doRegister()" style="width:100%;">注册</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirm Modal -->
+<div class="confirm-overlay" id="confirm-overlay">
+  <div class="confirm-card">
+    <div class="confirm-title">
+      <svg width="20" height="20" fill="none" stroke="#ef4444" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      确认删除文献
+    </div>
+    <div class="confirm-body" id="confirm-body">
+      确定要删除这篇文献吗？删除后将无法恢复。
+    </div>
+    <div class="confirm-actions">
+      <button class="btn btn-secondary" onclick="app.cancelDelete()">取消</button>
+      <button class="btn btn-danger" onclick="app.confirmDelete()">确认删除</button>
+    </div>
+  </div>
 </div>
 
 <!-- Editor / Detail Modal -->
@@ -1076,7 +1273,8 @@ function createEmptyPaper() {
     week: '',
     recorder: localStorage.getItem('embodied_member_name') || '',
     readDate: new Date().toISOString().slice(0,10),
-    shared: '是',
+    shared: '否',
+    favorite: '否',
     relevance: 3,
     novelty: 3,
     evidence: 3,
@@ -1135,11 +1333,17 @@ function computeScore(p) {
 // ===================== API Layer =====================
 const API_BASE = '';  // Same origin; change if backend is on different host
 let APP_PASSWORD = localStorage.getItem('embodied_password') || '';
+let CURRENT_USER = localStorage.getItem('embodied_username') || '';
+
+function apiHeaders() {
+  const h = {};
+  if (APP_PASSWORD) h['X-App-Password'] = APP_PASSWORD;
+  if (CURRENT_USER) h['X-User-Name'] = CURRENT_USER;
+  return h;
+}
 
 async function apiGet(path) {
-  const resp = await fetch(API_BASE + path, {
-    headers: APP_PASSWORD ? {'X-App-Password': APP_PASSWORD} : {}
-  });
+  const resp = await fetch(API_BASE + path, { headers: apiHeaders() });
   if (resp.status === 401) {
     app.promptPassword();
     throw new Error('Unauthorized');
@@ -1151,10 +1355,7 @@ async function apiGet(path) {
 async function apiPost(path, body) {
   const resp = await fetch(API_BASE + path, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(APP_PASSWORD ? {'X-App-Password': APP_PASSWORD} : {})
-    },
+    headers: { 'Content-Type': 'application/json', ...apiHeaders() },
     body: JSON.stringify(body)
   });
   if (resp.status === 401) {
@@ -1171,10 +1372,7 @@ async function apiPost(path, body) {
 async function apiPut(path, body) {
   const resp = await fetch(API_BASE + path, {
     method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(APP_PASSWORD ? {'X-App-Password': APP_PASSWORD} : {})
-    },
+    headers: { 'Content-Type': 'application/json', ...apiHeaders() },
     body: JSON.stringify(body)
   });
   if (resp.status === 401) {
@@ -1197,7 +1395,7 @@ async function apiPut(path, body) {
 async function apiDelete(path) {
   const resp = await fetch(API_BASE + path, {
     method: 'DELETE',
-    headers: APP_PASSWORD ? {'X-App-Password': APP_PASSWORD} : {}
+    headers: apiHeaders()
   });
   if (resp.status === 401) {
     app.promptPassword();
@@ -1224,13 +1422,19 @@ const app = {
   metadataCandidates: [],
   commentsByPaper: {},
   categoryDraft: [],
+  currentUser: CURRENT_USER,
 
   async init() {
+    if (!this.currentUser) {
+      this.showLogin();
+      return;
+    }
+    document.getElementById('login-overlay').classList.add('hidden');
+    this.updateUserUI();
     await this.loadData();
     this.applySidebarState();
     this.renderSidebarNav();
     this.setupEvents();
-    this.updateMemberLabel();
     this.updateNavCounts();
     this.render();
   },
@@ -1274,6 +1478,11 @@ const app = {
           <span class="nav-item-label">全部文献</span>
           <span class="count" id="nav-all">0</span>
         </div>
+        <div class="nav-item ${this.currentView === 'favorites' ? 'active' : ''}" data-view="favorites" data-cat="">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <span class="nav-item-label">我的收藏</span>
+          <span class="count" id="nav-fav">0</span>
+        </div>
       </div>
 
       <div class="nav-label ${researchOpen ? 'open' : 'closed'}" data-section="research" onclick="app.toggleNavSection('research')">
@@ -1308,8 +1517,10 @@ const app = {
   updateNavCounts() {
     const totalEl = document.getElementById('nav-total');
     const allEl = document.getElementById('nav-all');
+    const favEl = document.getElementById('nav-fav');
     if (totalEl) totalEl.textContent = this.papers.length;
     if (allEl) allEl.textContent = this.papers.length;
+    if (favEl) favEl.textContent = this.papers.filter(p => p.favorite === '是').length;
     CATEGORIES.forEach((cat, i) => {
       const count = this.papers.filter(p => getPaperCategories(p).includes(cat)).length;
       const el = document.getElementById('nav-cat-' + i);
@@ -1332,6 +1543,22 @@ const app = {
     // Modal click outside
     document.getElementById('modal').addEventListener('click', e => {
       if (e.target.id === 'modal') this.closeModal();
+    });
+
+    // Confirm overlay click outside
+    document.getElementById('confirm-overlay').addEventListener('click', e => {
+      if (e.target.id === 'confirm-overlay') this.cancelDelete();
+    });
+
+    // ESC to close modals
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        if (document.getElementById('confirm-overlay').classList.contains('open')) {
+          this.cancelDelete();
+        } else if (document.getElementById('modal').classList.contains('open')) {
+          this.closeModal();
+        }
+      }
     });
   },
 
@@ -1519,6 +1746,9 @@ const app = {
     if (this.currentStatus) {
       list = list.filter(p => (p.status || '深读中') === this.currentStatus);
     }
+    if (this.currentView === 'favorites') {
+      list = list.filter(p => p.favorite === '是');
+    }
     const sort = document.getElementById('sort-select').value;
     list.sort((a, b) => {
       switch(sort) {
@@ -1537,15 +1767,40 @@ const app = {
 
   render() {
     const content = document.getElementById('content-area');
+    let html = '';
     if (this.currentView === 'dashboard') {
-      content.innerHTML = this.renderDashboard();
+      html = this.renderDashboard();
     } else if (this.currentView === 'list') {
-      content.innerHTML = this.renderList();
+      html = this.renderList();
+    } else if (this.currentView === 'favorites') {
+      html = this.renderFavorites();
     } else if (this.currentView === 'rating') {
-      content.innerHTML = this.renderRating();
+      html = this.renderRating();
     } else if (this.currentView === 'ppt') {
-      content.innerHTML = this.renderPPT();
+      html = this.renderPPT();
     }
+    content.innerHTML = html;
+    content.classList.remove('page-enter');
+    void content.offsetWidth;
+    content.classList.add('page-enter');
+  },
+
+  renderFavorites() {
+    const papers = this.getFilteredPapers();
+    return `
+      <div class="fade-in">
+        <div class="page-title">⭐ 我的收藏</div>
+        <div class="page-desc">共 ${papers.length} 篇收藏文献</div>
+        <div class="filter-bar">
+          <select id="filter-status" onchange="app.filterStatus(this.value)">
+            <option value="">全部状态</option>
+            ${STATUS_OPTIONS.map(s=>`<option value="${s}" ${this.currentStatus===s?'selected':''}>${s}</option>`).join('')}
+          </select>
+        </div>
+        ${papers.length ? `<div class="cards-grid">${papers.map(p=>this.renderCard(p)).join('')}</div>`
+          : `<div class="empty-state"><h3>暂无收藏</h3><p>点击文献卡片上的星标即可收藏</p></div>`}
+      </div>
+    `;
   },
 
   // ===================== Dashboard =====================
@@ -1553,6 +1808,7 @@ const app = {
     const total = this.papers.length;
     const avgScore = total ? (this.papers.reduce((s,p)=>s+computeScore(p),0)/total).toFixed(2) : '0.00';
     const shared = this.papers.filter(p=>p.shared==='是').length;
+    const favCount = this.papers.filter(p=>p.favorite==='是').length;
     const latest = [...this.papers].sort((a,b)=>(b.readDate||'').localeCompare(a.readDate||'')).slice(0,5);
     const topPapers = [...this.papers].sort((a,b)=>computeScore(b)-computeScore(a)).slice(0,5);
 
@@ -1564,6 +1820,7 @@ const app = {
           <div class="stat-card"><div class="label">文献总数</div><div class="value">${total}</div></div>
           <div class="stat-card"><div class="label">平均综合评分</div><div class="value">${avgScore}</div></div>
           <div class="stat-card"><div class="label">已分享</div><div class="value">${shared}</div></div>
+          <div class="stat-card"><div class="label">我的收藏</div><div class="value" style="color:#f59e0b;">${favCount}</div></div>
           <div class="stat-card"><div class="label">研究方向</div><div class="value">${CATEGORIES.length}</div></div>
         </div>
 
@@ -1588,8 +1845,14 @@ const app = {
   renderMiniCard(p) {
     const score = computeScore(p);
     const categories = getPaperCategories(p);
+    const favOn = p.favorite === '是';
     return `
       <div class="paper-card" onclick="app.openDetail('${p.id}')">
+        <div class="card-favorite">
+          <button class="favorite-btn ${favOn?'on':''}" onclick="event.stopPropagation(); app.toggleFavorite('${p.id}')" title="收藏">
+            <svg width="16" height="16" fill="${favOn?'currentColor':'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          </button>
+        </div>
         <div class="card-header">
           <div class="card-title">${this.escape(p.title) || '未命名文献'}</div>
           <div class="card-score"><div class="score-value">${score}</div><div class="score-label">综合</div></div>
@@ -1657,11 +1920,17 @@ const app = {
     const stars = (n) => Array.from({length:5},(_,i)=>`<span class="star-dot ${i<n?'on':''}"></span>`).join('');
     const categories = getPaperCategories(p);
     const tags = getPaperTags(p);
+    const favOn = p.favorite === '是';
     return `
       <div class="paper-card" onclick="app.openDetail('${p.id}')">
         <div class="card-header">
           <div class="card-title">${this.escape(p.title) || '未命名文献'}</div>
-          <div class="card-score"><div class="score-value">${score}</div><div class="score-label">综合评分</div></div>
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+            <button class="favorite-btn ${favOn?'on':''}" onclick="event.stopPropagation(); app.toggleFavorite('${p.id}')" title="收藏">
+              <svg width="16" height="16" fill="${favOn?'currentColor':'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            </button>
+            <div class="card-score"><div class="score-value">${score}</div><div class="score-label">综合评分</div></div>
+          </div>
         </div>
         <div class="card-meta">
           ${categories.slice(0,3).map(c=>`<span class="tag">${this.escape(c)}</span>`).join('')}
@@ -1723,7 +1992,8 @@ const app = {
             <p>
               <strong>分类：</strong>${categories.map(c=>this.escape(c)).join(' / ') || '-'}<br>
               <strong>标签：</strong>${tags.length ? tags.map(t=>'#'+this.escape(t)).join(' ') : '-'}<br>
-              <strong>状态：</strong>${this.escape(p.status || '深读中')}<br>
+              <strong>状态：</strong>${this.escape(p.status || '深读中')} &nbsp;|&nbsp;
+              <strong>收藏：</strong>${p.favorite==='是' ? '⭐ 已收藏' : '未收藏'}<br>
               <strong>周次：</strong>${this.escape(p.week)||'-'} &nbsp;|&nbsp;
               <strong>记录人：</strong>${this.escape(p.recorder)||'-'} &nbsp;|&nbsp;
               <strong>日期：</strong>${p.readDate||'-'} &nbsp;|&nbsp;
@@ -1763,7 +2033,12 @@ const app = {
         </div>
         <div style="position:sticky;top:0;align-self:start;">
           <div style="background:#f8fafc;border-radius:12px;padding:16px;text-align:center;margin-bottom:16px;">
-            <div style="font-size:32px;font-weight:700;color:var(--primary);">${score}</div>
+            <div style="display:flex;align-items:center;justify-content:center;gap:10px;">
+              <div style="font-size:32px;font-weight:700;color:var(--primary);">${score}</div>
+              <button class="favorite-btn ${p.favorite==='是'?'on':''}" style="font-size:22px;padding:2px;" onclick="app.toggleFavorite('${p.id}')" title="收藏">
+                <svg width="24" height="24" fill="${p.favorite==='是'?'currentColor':'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+              </button>
+            </div>
             <div style="font-size:12px;color:var(--text-secondary);">综合评分</div>
           </div>
           <div style="background:#f8fafc;border-radius:12px;padding:16px;">
@@ -2178,7 +2453,14 @@ const app = {
       inspiration: parseFloat(document.getElementById('score-inspiration').value)||0,
       reproducibility: parseFloat(document.getElementById('score-reproducibility').value)||0
     };
-    document.getElementById('auto-score').textContent = computeScore(tmp);
+    const el = document.getElementById('auto-score');
+    const oldVal = parseFloat(el.textContent) || 0;
+    const newVal = computeScore(tmp);
+    el.textContent = newVal;
+    if (Math.abs(newVal - oldVal) > 0.01) {
+      el.classList.add('pop');
+      setTimeout(() => el.classList.remove('pop'), 250);
+    }
   },
 
   getFormSnapshot() {
@@ -2211,29 +2493,135 @@ const app = {
   },
 
   getMemberName(required = false) {
-    let name = localStorage.getItem('embodied_member_name') || '';
+    let name = this.currentUser || localStorage.getItem('embodied_member_name') || '';
     if (!name && required) {
       name = prompt('请输入你的姓名或昵称，用于记录是谁更新了文献：') || '';
       name = name.trim();
       if (name) localStorage.setItem('embodied_member_name', name);
-      this.updateMemberLabel();
     }
     return name;
   },
 
-  setMemberName() {
-    const current = localStorage.getItem('embodied_member_name') || '';
-    const name = prompt('请输入你的姓名或昵称：', current);
-    if (name === null) return;
-    const clean = name.trim();
-    if (clean) localStorage.setItem('embodied_member_name', clean);
-    else localStorage.removeItem('embodied_member_name');
-    this.updateMemberLabel();
+  showLogin() {
+    document.getElementById('login-overlay').classList.remove('hidden');
+    document.getElementById('login-username').focus();
   },
 
-  updateMemberLabel() {
-    const el = document.getElementById('member-label');
-    if (el) el.textContent = localStorage.getItem('embodied_member_name') || '成员';
+  switchLoginTab(tab) {
+    document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+    document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+    document.getElementById('login-form-panel').style.display = tab === 'login' ? 'flex' : 'none';
+    document.getElementById('register-form-panel').style.display = tab === 'register' ? 'flex' : 'none';
+    document.getElementById('login-error').textContent = '';
+    document.getElementById('register-error').textContent = '';
+  },
+
+  getAppPasswordFromLogin() {
+    const loginPw = document.getElementById('login-app-password')?.value || '';
+    const regPw = document.getElementById('register-app-password')?.value || '';
+    return loginPw || regPw;
+  },
+
+  async doLogin() {
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value;
+    const appPassword = document.getElementById('login-app-password').value;
+    const errorEl = document.getElementById('login-error');
+    if (!username || !password) {
+      errorEl.textContent = '请输入用户名和密码';
+      return;
+    }
+    // Save app password if provided
+    if (appPassword) {
+      APP_PASSWORD = appPassword;
+      localStorage.setItem('embodied_password', appPassword);
+    }
+    try {
+      const resp = await fetch(API_BASE + '/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...apiHeaders() },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        errorEl.textContent = data.error || '登录失败';
+        return;
+      }
+      this.currentUser = data.username;
+      CURRENT_USER = data.username;
+      localStorage.setItem('embodied_username', data.username);
+      document.getElementById('login-overlay').classList.add('hidden');
+      this.updateUserUI();
+      await this.init();
+    } catch(e) {
+      errorEl.textContent = '网络错误，请重试';
+    }
+  },
+
+  async doRegister() {
+    const username = document.getElementById('register-username').value.trim();
+    const password = document.getElementById('register-password').value;
+    const password2 = document.getElementById('register-password2').value;
+    const appPassword = document.getElementById('register-app-password').value;
+    const errorEl = document.getElementById('register-error');
+    if (!username || !password) {
+      errorEl.textContent = '请输入用户名和密码';
+      return;
+    }
+    if (password !== password2) {
+      errorEl.textContent = '两次输入的密码不一致';
+      return;
+    }
+    // Save app password if provided
+    if (appPassword) {
+      APP_PASSWORD = appPassword;
+      localStorage.setItem('embodied_password', appPassword);
+    }
+    try {
+      const resp = await fetch(API_BASE + '/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...apiHeaders() },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        errorEl.textContent = data.error || '注册失败';
+        return;
+      }
+      errorEl.textContent = '注册成功，请登录';
+      errorEl.style.color = 'var(--success)';
+      setTimeout(() => {
+        errorEl.style.color = '';
+        this.switchLoginTab('login');
+        document.getElementById('login-username').value = username;
+      }, 800);
+    } catch(e) {
+      errorEl.textContent = '网络错误，请重试';
+    }
+  },
+
+  updateUserUI() {
+    const menu = document.getElementById('user-menu');
+    const nameEl = document.getElementById('user-name');
+    const avatarEl = document.getElementById('user-avatar');
+    if (menu && nameEl && avatarEl && this.currentUser) {
+      menu.style.display = 'inline-flex';
+      nameEl.textContent = this.currentUser;
+      avatarEl.textContent = this.currentUser.charAt(0).toUpperCase();
+    }
+  },
+
+  showUserDropdown() {
+    if (confirm(`当前用户：${this.currentUser}\n\n要退出登录吗？`)) {
+      this.logout();
+    }
+  },
+
+  logout() {
+    this.currentUser = '';
+    CURRENT_USER = '';
+    localStorage.removeItem('embodied_username');
+    location.reload();
   },
 
   async savePaper() {
@@ -2307,8 +2695,30 @@ const app = {
     }
   },
 
-  async deletePaper(id) {
-    if (!confirm('确定要删除这篇文献吗？')) return;
+  // Delete confirmation
+  pendingDeleteId: null,
+
+  showDeleteConfirm(id) {
+    const p = this.papers.find(x => x.id === id);
+    const title = p ? (p.title || '未命名文献') : '';
+    const bodyEl = document.getElementById('confirm-body');
+    if (bodyEl) {
+      bodyEl.innerHTML = `确定要删除 <strong>「${this.escape(title)}」</strong> 吗？<br>删除后将无法恢复，关联的评论也会被一并删除。`;
+    }
+    this.pendingDeleteId = id;
+    document.getElementById('confirm-overlay').classList.add('open');
+  },
+
+  cancelDelete() {
+    this.pendingDeleteId = null;
+    document.getElementById('confirm-overlay').classList.remove('open');
+  },
+
+  async confirmDelete() {
+    const id = this.pendingDeleteId;
+    this.pendingDeleteId = null;
+    document.getElementById('confirm-overlay').classList.remove('open');
+    if (!id) return;
     try {
       await apiDelete('/api/papers/' + id);
       this.papers = this.papers.filter(p=>p.id!==id);
@@ -2317,6 +2727,32 @@ const app = {
       this.render();
     } catch(e) {
       alert('删除失败: ' + e.message);
+    }
+  },
+
+  async deletePaper(id) {
+    this.showDeleteConfirm(id);
+  },
+
+  async toggleFavorite(id) {
+    const p = this.papers.find(x => x.id === id);
+    if (!p) return;
+    const next = p.favorite === '是' ? '否' : '是';
+    try {
+      const result = await apiPost('/api/papers/' + id + '/favorite', { favorite: next === '是' });
+      const idx = this.papers.findIndex(x => x.id === id);
+      if (idx >= 0) this.papers[idx].favorite = result.favorite || next;
+      this.saveData();
+      // Re-render if modal is open showing this paper
+      if (this.editingId === id && this.modalMode === 'detail') {
+        const updated = { ...this.papers[idx] };
+        document.getElementById('modal-body').innerHTML = this.renderDetailBody(updated);
+        setTimeout(() => this.renderRadar(updated), 150);
+        this.loadComments(id);
+      }
+      this.render();
+    } catch(e) {
+      alert('收藏操作失败: ' + e.message);
     }
   },
 

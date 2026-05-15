@@ -35,7 +35,7 @@ def require_auth(f):
 import sqlite3
 
 FIELDS = [
-    'id','category','categories','tags','status','week','recorder','readDate','shared',
+    'id','category','categories','tags','status','week','recorder','readDate','shared','favorite',
     'relevance','novelty','evidence','inspiration','reproducibility',
     'title','source','link','direction','oneSentence','authors',
     'task','motivation','dataset','platform','signalAnalysis',
@@ -135,6 +135,7 @@ def init_db():
         'categories': 'TEXT',
         'tags': 'TEXT',
         'status': "TEXT DEFAULT '深读中'",
+        'favorite': "TEXT DEFAULT '否'",
         'created_by': 'TEXT',
         'updated_by': 'TEXT',
         'abstract': 'TEXT',
@@ -174,9 +175,29 @@ def init_db():
     conn.commit()
     conn.close()
 
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def get_user(conn, username):
+    row = conn.execute('SELECT id, username FROM users WHERE username = ?', (username,)).fetchone()
+    return dict(row) if row else None
+
+def inject_favorites(conn, papers, username):
+    if not username or not papers:
+        return papers
+    paper_ids = [p['id'] for p in papers]
+    placeholders = ','.join(['?'] * len(paper_ids))
+    rows = conn.execute(
+        f'SELECT paper_id FROM favorites WHERE user_id = ? AND paper_id IN ({placeholders})',
+        (username, *paper_ids)
+    ).fetchall()
+    fav_set = {r['paper_id'] for r in rows}
+    for p in papers:
+        p['favorite'] = '是' if p['id'] in fav_set else '否'
+    return papers
+
 def row_to_dict(row):
     d = dict(row)
-    # Ensure numeric scores are numbers
     for k in ['relevance','novelty','evidence','inspiration','reproducibility']:
         if d.get(k) is not None:
             try:
@@ -186,6 +207,7 @@ def row_to_dict(row):
     d['categories'] = parse_list(d.get('categories') or d.get('category'))
     d['tags'] = parse_list(d.get('tags'))
     d['status'] = d.get('status') or '深读中'
+    d['favorite'] = '否'
     return d
 
 def comment_to_dict(row):
@@ -245,13 +267,56 @@ def load_initial_data():
 
 # ===================== API Routes =====================
 
+@app.route('/api/auth/register', methods=['POST'])
+@require_auth
+def register():
+    data = request.get_json(force=True) or {}
+    username = str(data.get('username') or '').strip()
+    password = str(data.get('password') or '').strip()
+    if not username or not password:
+        return jsonify({'error': 'Username and password are required'}), 400
+    if len(username) < 2 or len(username) > 32:
+        return jsonify({'error': 'Username must be 2-32 characters'}), 400
+    if len(password) < 4:
+        return jsonify({'error': 'Password must be at least 4 characters'}), 400
+    conn = get_db()
+    existing = conn.execute('SELECT id FROM users WHERE username = ?', (username,)).fetchone()
+    if existing:
+        conn.close()
+        return jsonify({'error': 'Username already exists'}), 409
+    user_id = secrets.token_hex(8)
+    now = datetime.now().isoformat()
+    conn.execute('INSERT INTO users (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)',
+                 (user_id, username, hash_password(password), now))
+    conn.commit()
+    conn.close()
+    return jsonify({'username': username}), 201
+
+@app.route('/api/auth/login', methods=['POST'])
+@require_auth
+def login():
+    data = request.get_json(force=True) or {}
+    username = str(data.get('username') or '').strip()
+    password = str(data.get('password') or '').strip()
+    if not username or not password:
+        return jsonify({'error': 'Username and password are required'}), 400
+    conn = get_db()
+    row = conn.execute('SELECT username, password_hash FROM users WHERE username = ?', (username,)).fetchone()
+    conn.close()
+    if not row or row['password_hash'] != hash_password(password):
+        return jsonify({'error': 'Invalid username or password'}), 401
+    return jsonify({'username': username})
+
 @app.route('/api/papers', methods=['GET'])
 @require_auth
 def list_papers():
     conn = get_db()
     rows = conn.execute('SELECT * FROM papers ORDER BY updated_at DESC').fetchall()
+    papers = [row_to_dict(r) for r in rows]
+    username = request.headers.get('X-User-Name', '')
+    papers = inject_favorites(conn, papers, username)
     conn.close()
-    return jsonify({'papers': [row_to_dict(r) for r in rows]})
+    return jsonify({'papers': papers})
 
 @app.route('/api/papers', methods=['POST'])
 @require_auth
@@ -310,9 +375,32 @@ def delete_paper(paper_id):
     conn = get_db()
     conn.execute('DELETE FROM comments WHERE paper_id = ?', (paper_id,))
     conn.execute('DELETE FROM papers WHERE id = ?', (paper_id,))
+    conn.execute('DELETE FROM favorites WHERE paper_id = ?', (paper_id,))
     conn.commit()
     conn.close()
     return jsonify({'success': True})
+
+@app.route('/api/papers/<paper_id>/favorite', methods=['POST'])
+@require_auth
+def toggle_favorite(paper_id):
+    data = request.get_json(force=True) or {}
+    username = request.headers.get('X-User-Name', '')
+    if not username:
+        return jsonify({'error': 'Login required'}), 401
+    favorite = data.get('favorite') is True
+    conn = get_db()
+    exists = conn.execute('SELECT 1 FROM papers WHERE id = ?', (paper_id,)).fetchone()
+    if not exists:
+        conn.close()
+        return jsonify({'error': 'Not found'}), 404
+    if favorite:
+        conn.execute('INSERT OR IGNORE INTO favorites (user_id, paper_id, created_at) VALUES (?, ?, ?)',
+                     (username, paper_id, datetime.now().isoformat()))
+    else:
+        conn.execute('DELETE FROM favorites WHERE user_id = ? AND paper_id = ?', (username, paper_id))
+    conn.commit()
+    conn.close()
+    return jsonify({'favorite': '是' if favorite else '否'})
 
 @app.route('/api/metadata/search', methods=['POST'])
 @require_auth

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>具身智能文献深读记录系统</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%233b82f6'/%3E%3Cpath d='M25 30 h22 v40 h-22 a5 5 0 0 1 -5 -5 v-30 a5 5 0 0 1 5 -5 z' fill='white' opacity='0.9'/%3E%3Cpath d='M53 30 h22 a5 5 0 0 1 5 5 v30 a5 5 0 0 1 -5 5 h-22 z' fill='white' opacity='0.6'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='15' y1='15' x2='88' y2='90'%3E%3Cstop stop-color='%2306b6d4'/%3E%3Cstop offset='0.55' stop-color='%233b82f6'/%3E%3Cstop offset='1' stop-color='%2310b981'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='24' fill='%23081424'/%3E%3Cpath d='M23 68c10-6 20-6 30 0V31c-10-6-20-6-30 0v37Z' fill='none' stroke='url(%23g)' stroke-width='6' stroke-linejoin='round'/%3E%3Cpath d='M77 68c-10-6-20-6-30 0V31c10-6 20-6 30 0v37Z' fill='none' stroke='%23e0f2fe' stroke-width='6' stroke-linejoin='round'/%3E%3Cpath d='M41 46h18M50 37v18M37 57l9-9M63 57l-9-9' stroke='%2306b6d4' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='37' r='5' fill='%2310b981'/%3E%3Ccircle cx='37' cy='57' r='4' fill='%233b82f6'/%3E%3Ccircle cx='63' cy='57' r='4' fill='%23f59e0b'/%3E%3C/svg%3E">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
@@ -789,6 +789,24 @@
     outline: none;
     background: white;
   }
+  .page-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .todo-card-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .todo-card-actions .btn {
+    position: relative;
+    z-index: 2;
+  }
 
   /* Responsive */
   @media (max-width: 768px) {
@@ -910,7 +928,7 @@
   }
   .dashboard-paper-layout {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-columns: minmax(560px, 1fr) 340px;
     gap: 24px;
     align-items: start;
     margin-top: 4px;
@@ -922,8 +940,57 @@
   }
   .dashboard-main-list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-    gap: 16px;
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .dashboard-main-list .paper-card {
+    min-height: 184px;
+    padding: 24px 28px;
+    border-color: rgba(226,232,240,0.72);
+  }
+  .dashboard-main-list .card-header {
+    gap: 18px;
+    margin-bottom: 14px;
+  }
+  .dashboard-main-list .card-title {
+    font-size: 18px;
+    line-height: 1.35;
+    -webkit-line-clamp: 2;
+  }
+  .dashboard-main-list .score-value {
+    font-size: 32px;
+  }
+  .dashboard-main-list .score-label {
+    font-size: 11px;
+  }
+  .dashboard-main-list .card-meta {
+    gap: 9px;
+    margin-bottom: 14px;
+  }
+  .dashboard-main-list .tag {
+    padding: 4px 9px;
+    font-size: 12px;
+  }
+  .dashboard-main-list .card-summary {
+    font-size: 14px;
+    line-height: 1.65;
+    -webkit-line-clamp: 4;
+    margin-bottom: 16px;
+  }
+  .dashboard-main-list .card-footer {
+    font-size: 13px;
+    padding-top: 14px;
+  }
+  .dashboard-main-list .actor-badge {
+    max-width: 160px;
+    padding: 3px 8px;
+    font-size: 12px;
+  }
+  .dashboard-main-list .card-stars {
+    gap: 14px;
+  }
+  .dashboard-main-list .star-item {
+    font-size: 12px;
   }
   .dashboard-side-list {
     display: grid;
@@ -984,6 +1051,7 @@
     color: white; font-size: 16px; font-weight: 700; flex-shrink: 0;
     box-shadow: 0 2px 8px rgba(59,130,246,0.35);
   }
+  .logo-icon svg { width: 100%; height: 100%; display: block; }
   .app.sidebar-collapsed .brand { justify-content: center; }
 
   /* ===== Modal Animation ===== */
@@ -1117,6 +1185,425 @@
     color: white; font-size: 11px; font-weight: 700;
     display: inline-flex; align-items: center; justify-content: center;
   }
+
+  /* ===== Visual Refresh 2026 ===== */
+  :root {
+    --bg: #f6f8fb;
+    --bg-lift: #fbfdff;
+    --card-bg: rgba(255,255,255,0.88);
+    --sidebar-bg: #0b1424;
+    --sidebar-text: #91a3ba;
+    --sidebar-active: #63d6ff;
+    --sidebar-active-bg: rgba(14,165,233,0.16);
+    --text: #102033;
+    --text-secondary: #667891;
+    --border: #dbe5ef;
+    --primary: #2563eb;
+    --primary-hover: #1d4ed8;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --radius: 8px;
+    --shadow: 0 12px 30px rgba(15, 23, 42, 0.07);
+    --shadow-lg: 0 22px 55px rgba(15, 23, 42, 0.13);
+    --ring: 0 0 0 4px rgba(37, 99, 235, 0.12);
+    --accent-cyan: #06b6d4;
+    --accent-emerald: #10b981;
+  }
+  body {
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.92), rgba(246,248,251,0.96)),
+      radial-gradient(circle at 20% 0%, rgba(6,182,212,0.12), transparent 30%),
+      radial-gradient(circle at 90% 18%, rgba(16,185,129,0.10), transparent 32%);
+    color: var(--text);
+    letter-spacing: 0;
+  }
+  .sidebar {
+    background:
+      linear-gradient(180deg, rgba(12,24,42,0.98), rgba(8,17,31,0.98)),
+      linear-gradient(145deg, rgba(6,182,212,0.16), transparent 42%);
+    border-right: 1px solid rgba(148,163,184,0.18);
+    box-shadow: 18px 0 44px rgba(15,23,42,0.12);
+  }
+  .sidebar-header {
+    padding: 24px 18px 22px;
+    border-bottom-color: rgba(148,163,184,0.16);
+  }
+  .sidebar-header h1 {
+    font-size: 17px;
+    letter-spacing: 0;
+  }
+  .sidebar-header p {
+    color: #8fb1d6;
+    opacity: 0.82;
+  }
+  .sidebar-toggle {
+    border-color: rgba(148,163,184,0.24);
+    background: rgba(255,255,255,0.06);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+  }
+  .nav-label {
+    padding: 10px 22px 6px;
+    color: #d7e3f2;
+    opacity: 0.78;
+    font-size: 12px;
+  }
+  .nav-label button,
+  .nav-item .count {
+    background: rgba(148,163,184,0.13);
+    border: 1px solid rgba(148,163,184,0.12);
+  }
+  .nav-item {
+    margin: 2px 10px 2px 0;
+    padding: 10px 18px 10px 22px;
+    border-left-width: 4px;
+    border-radius: 0 8px 8px 0;
+    color: #91a3ba;
+  }
+  .nav-item:hover {
+    color: #eaf4ff;
+    background: rgba(148,163,184,0.08);
+    transform: translateX(3px);
+  }
+  .nav-item.active {
+    color: #e8f8ff;
+    background:
+      linear-gradient(90deg, rgba(37,99,235,0.30), rgba(6,182,212,0.12)),
+      rgba(255,255,255,0.03);
+    border-left-color: var(--accent-cyan);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 12px 24px rgba(8,17,31,0.18);
+  }
+  .nav-item.active .count {
+    background: linear-gradient(135deg, #2563eb, #06b6d4);
+    color: #fff;
+    border-color: transparent;
+  }
+  .main {
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.62), rgba(246,248,251,0.78)),
+      linear-gradient(120deg, rgba(37,99,235,0.04), transparent 38%);
+  }
+  .topbar {
+    height: 68px;
+    background: rgba(255,255,255,0.82);
+    border-bottom-color: rgba(219,229,239,0.88);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.8), 0 12px 28px rgba(15,23,42,0.05);
+    backdrop-filter: blur(16px);
+  }
+  .content {
+    padding: 28px;
+  }
+  .page-title {
+    font-size: 24px;
+    line-height: 1.25;
+    letter-spacing: 0;
+    color: #0f1f33;
+  }
+  .page-desc {
+    color: #62748c;
+    margin-bottom: 22px;
+  }
+  .search-box {
+    max-width: 420px;
+  }
+  .search-box input,
+  .sort-select,
+  .filter-bar select,
+  .form-field input,
+  .form-field textarea,
+  .form-field select,
+  .comment-form textarea,
+  .comment-form select,
+  .identify-row input,
+  .category-row input {
+    border-color: var(--border);
+    background: rgba(255,255,255,0.92);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.75);
+  }
+  .search-box input {
+    min-height: 44px;
+    border-radius: 8px;
+  }
+  .search-box input:focus,
+  .sort-select:focus,
+  .filter-bar select:focus,
+  .form-field input:focus,
+  .form-field textarea:focus,
+  .form-field select:focus,
+  .comment-form textarea:focus,
+  .comment-form select:focus,
+  .identify-row input:focus {
+    border-color: rgba(37,99,235,0.62);
+    box-shadow: var(--ring);
+  }
+  .btn {
+    min-height: 38px;
+    border-radius: 8px;
+    font-weight: 650;
+    letter-spacing: 0;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+  }
+  .btn:hover {
+    transform: translateY(-1px);
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, #2563eb, #0891b2);
+    box-shadow: 0 10px 22px rgba(37,99,235,0.24);
+  }
+  .btn-primary:hover {
+    background: linear-gradient(135deg, #1d4ed8, #0e7490);
+    box-shadow: 0 14px 28px rgba(37,99,235,0.30);
+  }
+  .btn-secondary {
+    background: rgba(255,255,255,0.78);
+    border-color: rgba(203,213,225,0.92);
+    color: #213247;
+  }
+  .btn-secondary:hover {
+    background: #fff;
+    border-color: rgba(37,99,235,0.30);
+    color: #1d4ed8;
+  }
+  .stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 14px;
+  }
+  .stat-card,
+  .paper-card,
+  .rating-table,
+  .ppt-slide,
+  .metadata-card,
+  .comment-item,
+  .detail-section.highlight-section,
+  .dashboard-score-panel,
+  .login-card,
+  .confirm-card,
+  .modal {
+    background: var(--card-bg);
+    border: 1px solid rgba(219,229,239,0.84);
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(12px);
+  }
+  .stat-card {
+    position: relative;
+    overflow: hidden;
+    padding: 18px;
+  }
+  .stat-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(37,99,235,0.10), transparent 46%);
+    pointer-events: none;
+  }
+  .stat-card .label,
+  .stat-card .value {
+    position: relative;
+  }
+  .stat-card .label {
+    color: #667891;
+    font-weight: 650;
+  }
+  .stat-card .value {
+    font-size: 32px;
+    background: linear-gradient(135deg, #1d4ed8, #06b6d4);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .paper-card {
+    overflow: hidden;
+    border-color: rgba(219,229,239,0.82);
+  }
+  .paper-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #2563eb, #06b6d4, #10b981);
+    opacity: 0;
+    transition: opacity 0.18s ease;
+  }
+  .paper-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(37,99,235,0.34);
+    box-shadow: var(--shadow-lg);
+  }
+  .paper-card:hover::before {
+    opacity: 1;
+  }
+  .paper-visual {
+    display: grid;
+    grid-template-columns: 42px 1fr;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .paper-mark {
+    width: 42px;
+    height: 42px;
+    border-radius: 8px;
+    background:
+      linear-gradient(135deg, rgba(37,99,235,0.95), rgba(6,182,212,0.88)),
+      #2563eb;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    box-shadow: 0 12px 22px rgba(37,99,235,0.22);
+  }
+  .paper-mark svg {
+    width: 24px;
+    height: 24px;
+  }
+  .paper-kicker {
+    font-size: 11px;
+    color: #667891;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+  .paper-tags-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    min-width: 0;
+    margin-bottom: 2px;
+  }
+  .paper-tag-mini {
+    display: inline-flex;
+    align-items: center;
+    max-width: 180px;
+    padding: 2px 7px;
+    border-radius: 7px;
+    background: linear-gradient(135deg, #eef6ff, #ecfeff);
+    border: 1px solid rgba(14,165,233,0.16);
+    color: #1d4ed8;
+    font-size: 11px;
+    font-weight: 750;
+    line-height: 1.45;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .paper-date {
+    font-size: 11px;
+    color: #8a9bb0;
+    line-height: 1.4;
+  }
+  .card-title {
+    font-size: 16px;
+    color: #112238;
+    letter-spacing: 0;
+  }
+  .dashboard-main-list .card-title {
+    font-size: 19px;
+  }
+  .score-value {
+    color: #2563eb;
+    text-shadow: 0 8px 22px rgba(37,99,235,0.16);
+  }
+  .tag {
+    border-radius: 7px;
+    border: 1px solid rgba(79,70,229,0.10);
+    background: #edf5ff;
+    color: #2858d9;
+  }
+  .tag.green { background: #eafaf4; color: #047857; border-color: rgba(16,185,129,0.14); }
+  .tag.orange { background: #fff7eb; color: #c2410c; border-color: rgba(245,158,11,0.16); }
+  .tag.purple { background: #eef4ff; color: #1d4ed8; }
+  .tag.gray { background: #f3f6fa; color: #53657b; border-color: rgba(148,163,184,0.16); }
+  .card-summary {
+    color: #53657b;
+    font-size: 13px;
+  }
+  .card-footer {
+    border-top-color: rgba(219,229,239,0.84);
+  }
+  .actor-badge {
+    background: linear-gradient(135deg, #ecfeff, #eff6ff);
+    color: #0369a1;
+    border-color: rgba(14,165,233,0.20);
+  }
+  .dashboard-paper-layout {
+    grid-template-columns: minmax(560px, 1fr) 360px;
+  }
+  .dashboard-score-panel {
+    background:
+      linear-gradient(180deg, rgba(239,246,255,0.88), rgba(236,253,245,0.62)),
+      rgba(255,255,255,0.78);
+  }
+  .modal-overlay {
+    background: rgba(8,17,31,0.46);
+    backdrop-filter: blur(8px);
+  }
+  .modal {
+    max-width: 1000px;
+  }
+  .modal-header {
+    background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(248,250,252,0.88));
+  }
+  .form-section-title {
+    color: #1d4ed8;
+    border-bottom-color: #dbeafe;
+    letter-spacing: 0.2px;
+  }
+  .markdown-field,
+  .identify-panel,
+  .metadata-grid div {
+    background: rgba(255,255,255,0.78);
+    border-color: rgba(219,229,239,0.88);
+  }
+  .favorite-btn {
+    color: #b8c4d4;
+  }
+  .favorite-btn:hover,
+  .favorite-btn.on {
+    color: #f59e0b;
+  }
+  .logo-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: #081424;
+    box-shadow: 0 16px 30px rgba(6,182,212,0.22), inset 0 1px 0 rgba(255,255,255,0.10);
+  }
+  .login-logo .logo-icon {
+    width: 56px;
+    height: 56px;
+  }
+  .login-overlay {
+    background:
+      radial-gradient(circle at 30% 15%, rgba(6,182,212,0.22), transparent 34%),
+      radial-gradient(circle at 70% 70%, rgba(16,185,129,0.18), transparent 30%),
+      linear-gradient(135deg, #081424, #0f172a);
+  }
+  @keyframes pageEnter {
+    from { opacity: 0; transform: translateY(10px) scale(0.992); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @media (max-width: 920px) {
+    .topbar {
+      height: auto;
+      padding: 14px;
+      flex-wrap: wrap;
+    }
+    .search-box {
+      max-width: none;
+      min-width: 240px;
+    }
+    .content {
+      padding: 18px;
+    }
+  }
+  @media (max-width: 768px) {
+    .sidebar { width: 220px; }
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+    .cards-grid { grid-template-columns: 1fr; }
+    .card-footer { align-items: flex-start; gap: 10px; flex-direction: column; }
+  }
 </style>
 </head>
 <body>
@@ -1126,7 +1613,18 @@
     <div class="sidebar-header">
       <button class="sidebar-toggle" onclick="app.toggleSidebar()" title="收起/展开侧边栏">‹</button>
       <div class="brand">
-        <div class="logo-icon">E</div>
+        <div class="logo-icon" aria-hidden="true">
+          <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100" height="100" rx="24" fill="#081424"/>
+            <path d="M23 68c10-6 20-6 30 0V31c-10-6-20-6-30 0v37Z" stroke="url(#logoA)" stroke-width="6" stroke-linejoin="round"/>
+            <path d="M77 68c-10-6-20-6-30 0V31c10-6 20-6 30 0v37Z" stroke="#E0F2FE" stroke-width="6" stroke-linejoin="round"/>
+            <path d="M41 46h18M50 37v18M37 57l9-9M63 57l-9-9" stroke="#67E8F9" stroke-width="4" stroke-linecap="round"/>
+            <circle cx="50" cy="37" r="5" fill="#10B981"/>
+            <circle cx="37" cy="57" r="4" fill="#3B82F6"/>
+            <circle cx="63" cy="57" r="4" fill="#F59E0B"/>
+            <defs><linearGradient id="logoA" x1="22" y1="31" x2="58" y2="69" gradientUnits="userSpaceOnUse"><stop stop-color="#06B6D4"/><stop offset="0.55" stop-color="#3B82F6"/><stop offset="1" stop-color="#10B981"/></linearGradient></defs>
+          </svg>
+        </div>
         <div>
           <h1>具身智能文献<br>深读记录系统</h1>
           <p>Embodied Intelligence Paper Tracker</p>
@@ -1144,9 +1642,10 @@
         <input type="text" id="search-input" placeholder="搜索标题、作者、方向、定位...">
       </div>
       <select class="sort-select" id="sort-select">
-        <option value="date-desc">按日期新→旧</option>
+        <option value="date-desc">按发表时间新→旧</option>
         <option value="updated-desc">按最近更新</option>
-        <option value="date-asc">按日期旧→新</option>
+        <option value="date-asc">按发表时间旧→新</option>
+        <option value="citation-desc">按引用量高→低</option>
         <option value="score-desc">按综合评分高→低</option>
         <option value="score-asc">按综合评分低→高</option>
         <option value="relevance-desc">按相关性高→低</option>
@@ -1155,6 +1654,10 @@
       <button class="btn btn-secondary" onclick="app.exportData()">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         导出
+      </button>
+      <button class="btn btn-secondary" id="backfill-metadata-button" onclick="app.backfillMetadata()">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12a9 9 0 11-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+        补全元数据
       </button>
       <button class="btn btn-secondary" onclick="document.getElementById('import-file').click()">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -1181,7 +1684,18 @@
 <div class="login-overlay hidden" id="login-overlay">
   <div class="login-card">
     <div class="login-logo">
-      <div class="logo-icon">E</div>
+      <div class="logo-icon" aria-hidden="true">
+        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="100" height="100" rx="24" fill="#081424"/>
+          <path d="M23 68c10-6 20-6 30 0V31c-10-6-20-6-30 0v37Z" stroke="url(#loginLogoA)" stroke-width="6" stroke-linejoin="round"/>
+          <path d="M77 68c-10-6-20-6-30 0V31c10-6 20-6 30 0v37Z" stroke="#E0F2FE" stroke-width="6" stroke-linejoin="round"/>
+          <path d="M41 46h18M50 37v18M37 57l9-9M63 57l-9-9" stroke="#67E8F9" stroke-width="4" stroke-linecap="round"/>
+          <circle cx="50" cy="37" r="5" fill="#10B981"/>
+          <circle cx="37" cy="57" r="4" fill="#3B82F6"/>
+          <circle cx="63" cy="57" r="4" fill="#F59E0B"/>
+          <defs><linearGradient id="loginLogoA" x1="22" y1="31" x2="58" y2="69" gradientUnits="userSpaceOnUse"><stop stop-color="#06B6D4"/><stop offset="0.55" stop-color="#3B82F6"/><stop offset="1" stop-color="#10B981"/></linearGradient></defs>
+        </svg>
+      </div>
       <h1>具身智能文献深读记录系统</h1>
       <p>团队文献阅读与协作平台</p>
     </div>
@@ -1363,7 +1877,7 @@ function getPaperTags(p) {
 const FIELDS_DEF = [
   { key: 'week', label: '周次', section: 'basic', type: 'text' },
   { key: 'recorder', label: '记录人', section: 'basic', type: 'text' },
-  { key: 'readDate', label: '阅读日期', section: 'basic', type: 'date' },
+  { key: 'published_at', label: '文章发表时间', section: 'basic', type: 'date' },
   { key: 'status', label: '阅读状态', section: 'basic', type: 'select', options: STATUS_OPTIONS },
   { key: 'shared', label: '是否分享', section: 'basic', type: 'select', options: ['是','否'] },
   { key: 'title', label: '论文标题', section: 'paper', type: 'text', full: true },
@@ -1376,6 +1890,7 @@ const FIELDS_DEF = [
   { key: 'doi', label: 'DOI', section: 'metadata', type: 'text' },
   { key: 'arxiv_id', label: 'arXiv ID', section: 'metadata', type: 'text' },
   { key: 'openreview_id', label: 'OpenReview ID', section: 'metadata', type: 'text' },
+  { key: 'citation_count', label: '引用量', section: 'metadata', type: 'number' },
   { key: 'canonical_url', label: '规范链接', section: 'metadata', type: 'text', full: true },
   { key: 'task', label: '核心任务', section: 'content', type: 'textarea', full: true, rows: 4 },
   { key: 'motivation', label: '问题与动机', section: 'content', type: 'textarea', full: true },
@@ -1422,7 +1937,7 @@ function createEmptyPaper() {
     status: '深读中',
     week: '',
     recorder: localStorage.getItem('embodied_member_name') || '',
-    readDate: new Date().toISOString().slice(0,10),
+    readDate: '',
     shared: '否',
     favorite: '否',
     relevance: 3,
@@ -1440,6 +1955,9 @@ function createEmptyPaper() {
     doi: '',
     arxiv_id: '',
     openreview_id: '',
+    published_at: '',
+    citation_count: 0,
+    citation_source: '',
     metadata_source: '',
     metadata_checked_at: '',
     canonical_url: '',
@@ -1478,6 +1996,25 @@ function computeScore(p) {
   const rep = (parseFloat(p.reproducibility)||0);
   const total = r*WEIGHTS.relevance + n*WEIGHTS.novelty + e*WEIGHTS.evidence + i*WEIGHTS.inspiration + rep*WEIGHTS.reproducibility;
   return Math.round(total * 100) / 100;
+}
+
+function getPublicationDate(p) {
+  return (p.published_at || '').slice(0, 10);
+}
+
+function formatCitationCount(value) {
+  const count = Number.parseInt(value, 10);
+  return Number.isFinite(count) && count >= 0 ? String(count) : '';
+}
+
+function getCitationDisplay(p) {
+  const count = formatCitationCount(p.citation_count);
+  if (!count) return '';
+  return (p.citation_source || Number.parseInt(count, 10) > 0) ? count : '';
+}
+
+function getRecorderName(p) {
+  return p.recorder || p.created_by || p.updated_by || '';
 }
 
 // ===================== API Layer =====================
@@ -1561,6 +2098,7 @@ async function apiDelete(path) {
 // ===================== App State =====================
 const app = {
   papers: [],
+  todos: [],
   currentView: 'dashboard',
   currentCategory: '',
   currentStatus: '',
@@ -1598,6 +2136,13 @@ const app = {
       // Fallback: show empty state, user can input password if needed
       this.papers = [];
     }
+    try {
+      const data = await apiGet('/api/todos');
+      this.todos = data.todos || [];
+    } catch(e) {
+      console.warn('Failed to load todos:', e);
+      this.todos = [];
+    }
   },
 
   async syncStats() {
@@ -1632,6 +2177,11 @@ const app = {
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
           <span class="nav-item-label">我的收藏</span>
           <span class="count" id="nav-fav">0</span>
+        </div>
+        <div class="nav-item ${this.currentView === 'todos' ? 'active' : ''}" data-view="todos" data-cat="">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>
+          <span class="nav-item-label">我的待办</span>
+          <span class="count" id="nav-todo">0</span>
         </div>
       </div>
 
@@ -1668,9 +2218,11 @@ const app = {
     const totalEl = document.getElementById('nav-total');
     const allEl = document.getElementById('nav-all');
     const favEl = document.getElementById('nav-fav');
+    const todoEl = document.getElementById('nav-todo');
     if (totalEl) totalEl.textContent = this.papers.length;
     if (allEl) allEl.textContent = this.papers.length;
     if (favEl) favEl.textContent = this.papers.filter(p => p.favorite === '是').length;
+    if (todoEl) todoEl.textContent = this.todos.length;
     CATEGORIES.forEach((cat, i) => {
       const count = this.papers.filter(p => getPaperCategories(p).includes(cat)).length;
       const el = document.getElementById('nav-cat-' + i);
@@ -1886,6 +2438,8 @@ const app = {
           || (p.recorder||'').toLowerCase().includes(q)
           || (p.source||'').toLowerCase().includes(q)
           || (p.status||'').toLowerCase().includes(q)
+          || (p.published_at||'').toLowerCase().includes(q)
+          || String(p.citation_count || '').includes(q)
           || categoryText.toLowerCase().includes(q)
           || tagText.toLowerCase().includes(q);
       });
@@ -1903,13 +2457,51 @@ const app = {
     list.sort((a, b) => {
       switch(sort) {
         case 'updated-desc': return (b.updated_at||'').localeCompare(a.updated_at||'');
-        case 'date-desc': return (b.readDate||'').localeCompare(a.readDate||'');
-        case 'date-asc': return (a.readDate||'').localeCompare(b.readDate||'');
+        case 'date-desc': return getPublicationDate(b).localeCompare(getPublicationDate(a));
+        case 'date-asc': return getPublicationDate(a).localeCompare(getPublicationDate(b));
+        case 'citation-desc': return (parseInt(b.citation_count, 10) || 0) - (parseInt(a.citation_count, 10) || 0);
         case 'score-desc': return computeScore(b) - computeScore(a);
         case 'score-asc': return computeScore(a) - computeScore(b);
         case 'relevance-desc': return (b.relevance||0) - (a.relevance||0);
         case 'novelty-desc': return (b.novelty||0) - (a.novelty||0);
         default: return 0;
+      }
+    });
+    return list;
+  },
+
+  getFilteredTodos() {
+    let list = [...this.todos];
+    const q = document.getElementById('search-input').value.trim().toLowerCase();
+    if (q) {
+      list = list.filter(p => {
+        const categoryText = getPaperCategories(p).join(' ');
+        const tagText = getPaperTags(p).join(' ');
+        return (p.title||'').toLowerCase().includes(q)
+          || (p.authors||'').toLowerCase().includes(q)
+          || (p.direction||'').toLowerCase().includes(q)
+          || (p.oneSentence||'').toLowerCase().includes(q)
+          || (p.source||'').toLowerCase().includes(q)
+          || (p.status||'').toLowerCase().includes(q)
+          || categoryText.toLowerCase().includes(q)
+          || tagText.toLowerCase().includes(q);
+      });
+    }
+    if (this.currentStatus) {
+      list = list.filter(p => (p.status || '未读') === this.currentStatus);
+    }
+    const sort = document.getElementById('sort-select').value;
+    list.sort((a, b) => {
+      switch(sort) {
+        case 'date-desc': return getPublicationDate(b).localeCompare(getPublicationDate(a));
+        case 'date-asc': return getPublicationDate(a).localeCompare(getPublicationDate(b));
+        case 'citation-desc': return (parseInt(b.citation_count, 10) || 0) - (parseInt(a.citation_count, 10) || 0);
+        case 'score-desc': return computeScore(b) - computeScore(a);
+        case 'score-asc': return computeScore(a) - computeScore(b);
+        case 'relevance-desc': return (b.relevance||0) - (a.relevance||0);
+        case 'novelty-desc': return (b.novelty||0) - (a.novelty||0);
+        case 'updated-desc':
+        default: return (b.updated_at||'').localeCompare(a.updated_at||'');
       }
     });
     return list;
@@ -1924,6 +2516,8 @@ const app = {
       html = this.renderList();
     } else if (this.currentView === 'favorites') {
       html = this.renderFavorites();
+    } else if (this.currentView === 'todos') {
+      html = this.renderTodos();
     } else if (this.currentView === 'rating') {
       html = this.renderRating();
     } else if (this.currentView === 'ppt') {
@@ -1953,12 +2547,37 @@ const app = {
     `;
   },
 
+  renderTodos() {
+    const todos = this.getFilteredTodos();
+    return `
+      <div class="fade-in">
+        <div class="page-title">我的待办</div>
+        <div class="page-desc">共 ${todos.length} 篇准备阅读的待办论文；编辑完善后可推送到文献库。</div>
+        <div class="page-actions">
+          <div class="filter-bar" style="margin-bottom:0;">
+            <select id="filter-status" onchange="app.filterStatus(this.value)">
+              <option value="">全部状态</option>
+              ${STATUS_OPTIONS.map(s=>`<option value="${s}" ${this.currentStatus===s?'selected':''}>${s}</option>`).join('')}
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="app.openTodoEditor()">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            新增待办
+          </button>
+        </div>
+        ${todos.length ? `<div class="cards-grid">${todos.map(p=>this.renderTodoCard(p)).join('')}</div>`
+          : `<div class="empty-state"><h3>暂无待办</h3><p>把准备阅读的论文先放在这里，补全信息后再推送到文献库。</p></div>`}
+      </div>
+    `;
+  },
+
   // ===================== Dashboard =====================
   renderDashboard() {
     const total = this.papers.length;
     const shared = this.papers.filter(p=>p.shared==='是').length;
     const favCount = this.papers.filter(p=>p.favorite==='是').length;
-    const latest = [...this.papers].sort((a,b)=>(b.readDate||'').localeCompare(a.readDate||'')).slice(0,5);
+    const todoCount = this.todos.length;
+    const latest = [...this.papers].sort((a,b)=>getPublicationDate(b).localeCompare(getPublicationDate(a))).slice(0,5);
     const topPapers = [...this.papers].sort((a,b)=>computeScore(b)-computeScore(a)).slice(0,5);
 
     return `
@@ -1969,6 +2588,7 @@ const app = {
           <div class="stat-card"><div class="label">文献总数</div><div class="value">${total}</div></div>
           <div class="stat-card"><div class="label">已分享</div><div class="value">${shared}</div></div>
           <div class="stat-card"><div class="label">我的收藏</div><div class="value" style="color:#f59e0b;">${favCount}</div></div>
+          <div class="stat-card"><div class="label">我的待办</div><div class="value" style="background:linear-gradient(135deg,#0891b2,#10b981);-webkit-background-clip:text;background-clip:text;color:transparent;">${todoCount}</div></div>
           <div class="stat-card"><div class="label">研究方向</div><div class="value">${CATEGORIES.length}</div></div>
         </div>
 
@@ -1994,6 +2614,8 @@ const app = {
     const score = computeScore(p);
     const categories = getPaperCategories(p);
     const favOn = p.favorite === '是';
+    const publishedAt = getPublicationDate(p);
+    const citationCount = getCitationDisplay(p);
     return `
       <div class="paper-card" onclick="app.openDetail('${p.id}')">
         <div class="card-favorite">
@@ -2001,6 +2623,7 @@ const app = {
             <svg width="16" height="16" fill="${favOn?'currentColor':'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
           </button>
         </div>
+        ${this.renderPaperVisual(p)}
         <div class="card-header">
           <div class="card-title">${this.escape(p.title) || '未命名文献'}</div>
           <div class="card-score"><div class="score-value">${score}</div><div class="score-label">综合</div></div>
@@ -2008,12 +2631,13 @@ const app = {
         <div class="card-meta">
           ${categories.slice(0,2).map(c=>`<span class="tag">${this.escape(c)}</span>`).join('')}
           <span class="tag gray">${this.escape(p.status || '深读中')}</span>
-          <span class="tag green">${p.readDate||''}</span>
+          ${publishedAt ? `<span class="tag green">发表 ${this.escape(publishedAt)}</span>` : ''}
+          ${citationCount ? `<span class="tag orange">引用 ${citationCount}</span>` : ''}
         </div>
         <div class="card-summary">${renderMarkdownInline(p.oneSentence) || '暂无一句话定位'}</div>
         <div class="card-footer">
           <span class="card-footer-meta">
-            <span class="actor-badge">${this.escape(p.updated_by || p.recorder || '未记录')}</span>
+            <span class="actor-badge">${this.escape(getRecorderName(p) || '未记录')}</span>
             <span>${this.escape(p.authors || p.source || '').slice(0,30)}</span>
           </span>
           <div class="card-stars">
@@ -2069,8 +2693,11 @@ const app = {
     const categories = getPaperCategories(p);
     const tags = getPaperTags(p);
     const favOn = p.favorite === '是';
+    const publishedAt = getPublicationDate(p);
+    const citationCount = getCitationDisplay(p);
     return `
       <div class="paper-card" onclick="app.openDetail('${p.id}')">
+        ${this.renderPaperVisual(p)}
         <div class="card-header">
           <div class="card-title">${this.escape(p.title) || '未命名文献'}</div>
           <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
@@ -2085,19 +2712,82 @@ const app = {
           ${categories.length > 3 ? `<span class="tag gray">+${categories.length - 3}</span>` : ''}
           <span class="tag gray">${this.escape(p.status || '深读中')}</span>
           ${p.week ? `<span class="tag purple">${this.escape(p.week)}</span>` : ''}
-          <span class="tag green">${p.readDate||''}</span>
+          ${publishedAt ? `<span class="tag green">发表 ${this.escape(publishedAt)}</span>` : ''}
+          ${citationCount ? `<span class="tag orange">引用 ${citationCount}</span>` : ''}
           ${p.shared==='是' ? '<span class="tag orange">已分享</span>' : ''}
           ${tags.slice(0,2).map(t=>`<span class="tag gray">#${this.escape(t)}</span>`).join('')}
         </div>
         <div class="card-summary">${renderMarkdownInline(p.oneSentence) || '暂无一句话定位'}</div>
         <div class="card-footer">
           <span class="card-footer-meta">
-            <span class="actor-badge">${this.escape(p.updated_by || p.recorder || '匿名')}</span>
+            <span class="actor-badge">${this.escape(getRecorderName(p) || '匿名')}</span>
             <span>${this.escape(p.source || p.authors || '').slice(0,36)}</span>
           </span>
           <div class="card-stars">
             <span class="star-item" title="相关性">${stars(p.relevance||0)}</span>
           </div>
+        </div>
+      </div>
+    `;
+  },
+
+  renderTodoCard(p) {
+    const score = computeScore(p);
+    const categories = getPaperCategories(p);
+    const tags = getPaperTags(p);
+    const publishedAt = getPublicationDate(p);
+    const citationCount = getCitationDisplay(p);
+    return `
+      <div class="paper-card" onclick="app.openTodoEditor('${p.id}')">
+        ${this.renderPaperVisual(p)}
+        <div class="card-header">
+          <div class="card-title">${this.escape(p.title) || '未命名待办论文'}</div>
+          <div class="card-score"><div class="score-value">${score}</div><div class="score-label">预评分</div></div>
+        </div>
+        <div class="card-meta">
+          ${categories.slice(0,3).map(c=>`<span class="tag">${this.escape(c)}</span>`).join('')}
+          ${categories.length > 3 ? `<span class="tag gray">+${categories.length - 3}</span>` : ''}
+          <span class="tag gray">${this.escape(p.status || '未读')}</span>
+          ${publishedAt ? `<span class="tag green">发表 ${this.escape(publishedAt)}</span>` : ''}
+          ${citationCount ? `<span class="tag orange">引用 ${citationCount}</span>` : ''}
+          ${tags.slice(0,2).map(t=>`<span class="tag gray">#${this.escape(t)}</span>`).join('')}
+        </div>
+        <div class="card-summary">${renderMarkdownInline(p.oneSentence || p.abstract) || '可以先记录标题、链接、摘要或待读原因。'}</div>
+        <div class="card-footer">
+          <span class="card-footer-meta">
+            <span class="actor-badge">${this.escape(p.updated_by || p.created_by || this.currentUser || '我')}</span>
+            <span>${p.updated_at ? '更新 ' + this.formatChinaTime(p.updated_at) : this.escape(p.source || p.authors || '').slice(0,36)}</span>
+          </span>
+          <div class="todo-card-actions">
+            <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); app.openTodoEditor('${p.id}')">编辑</button>
+            <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); app.publishTodo('${p.id}')">推送</button>
+            <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); app.deleteTodo('${p.id}')">删除</button>
+          </div>
+        </div>
+      </div>
+    `;
+  },
+
+  renderPaperVisual(p) {
+    const tags = getPaperTags(p).map(tag => String(tag).replace(/^#+/, '').trim()).filter(Boolean);
+    const displayTags = tags.length ? tags.slice(0, 3) : ['未标注'];
+    const moreCount = Math.max(0, tags.length - displayTags.length);
+    const joinedDate = this.formatDateOnly(p.created_at || p.updated_at || p.readDate) || '待整理';
+    return `
+      <div class="paper-visual">
+        <div class="paper-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M5 18.5c3-1.8 6-1.8 9 0V6.5c-3-1.8-6-1.8-9 0v12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M19 18.5c-3-1.8-6-1.8-9 0V6.5c3-1.8 6-1.8 9 0v12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" opacity=".72"/>
+            <path d="M9 11h6M12 8.5v5M8 15l3-3M16 15l-3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity=".9"/>
+          </svg>
+        </div>
+        <div>
+          <div class="paper-tags-row">
+            ${displayTags.map(tag => `<span class="paper-tag-mini">#${this.escape(tag)}</span>`).join('')}
+            ${moreCount ? `<span class="paper-tag-mini">+${moreCount}</span>` : ''}
+          </div>
+          <div class="paper-date">加入日期：${this.escape(joinedDate)}</div>
         </div>
       </div>
     `;
@@ -2126,6 +2816,8 @@ const app = {
     const score = computeScore(p);
     const categories = getPaperCategories(p);
     const tags = getPaperTags(p);
+    const publishedAt = getPublicationDate(p);
+    const citationCount = getCitationDisplay(p);
     const s = (key, label, extraClass = '') => p[key] ? `<div class="detail-section ${extraClass}"><h4>${label}</h4><div class="markdown-body">${renderMarkdown(p[key])}</div></div>` : '';
     return `
       <div class="detail-meta-grid">
@@ -2144,7 +2836,8 @@ const app = {
               <strong>收藏：</strong>${p.favorite==='是' ? '⭐ 已收藏' : '未收藏'}<br>
               <strong>周次：</strong>${this.escape(p.week)||'-'} &nbsp;|&nbsp;
               <strong>记录人：</strong>${this.escape(p.recorder)||'-'} &nbsp;|&nbsp;
-              <strong>日期：</strong>${p.readDate||'-'} &nbsp;|&nbsp;
+              <strong>发表时间：</strong>${this.escape(publishedAt)||'-'} &nbsp;|&nbsp;
+              <strong>引用量：</strong>${citationCount || '-'} &nbsp;|&nbsp;
               <strong>分享：</strong>${p.shared||'-'}<br>
               <strong>创建人：</strong>${this.escape(p.created_by)||'-'} &nbsp;|&nbsp;
               <strong>最近更新：</strong>${this.escape(p.updated_by)||'-'} ${p.updated_at ? `(${this.formatChinaTime(p.updated_at)})` : ''}<br>
@@ -2207,16 +2900,19 @@ const app = {
       ['doi', 'DOI'],
       ['arxiv_id', 'arXiv'],
       ['openreview_id', 'OpenReview'],
+      ['published_at', '发表时间'],
+      ['citation_count', '引用量'],
+      ['citation_source', '引用来源'],
       ['metadata_source', '来源'],
       ['metadata_checked_at', '识别时间'],
       ['canonical_url', '规范链接']
-    ].filter(([key]) => p[key]);
+    ].filter(([key]) => key === 'citation_count' ? getCitationDisplay(p) : p[key]);
     if (!fields.length && !p.abstract) return '';
     return `
       <div class="detail-section">
         <h4>论文元数据</h4>
         ${fields.length ? `<div class="metadata-grid">
-          ${fields.map(([key,label])=>`<div><strong>${label}</strong><br>${this.escape(key.endsWith('_at') ? this.formatChinaTime(p[key]) : p[key])}</div>`).join('')}
+          ${fields.map(([key,label])=>`<div><strong>${label}</strong><br>${this.escape(this.formatMetadataValue(key, p[key]))}</div>`).join('')}
         </div>` : ''}
         ${p.abstract ? `<div class="markdown-body" style="margin-top:10px;">${renderMarkdown(p.abstract)}</div>` : ''}
       </div>
@@ -2388,6 +3084,35 @@ const app = {
     this.refreshMarkdownPreviews();
   },
 
+  openTodoEditor(id) {
+    const isEdit = !!id;
+    let p = isEdit ? this.todos.find(x=>x.id===id) : createEmptyPaper();
+    if (!p) p = createEmptyPaper();
+    if (!isEdit) {
+      p.status = '未读';
+      p.recorder = this.getMemberName(false) || this.currentUser || p.recorder || '';
+      p.created_by = this.currentUser || p.created_by || '';
+      p.updated_by = this.currentUser || p.updated_by || '';
+    }
+    this.editingId = isEdit ? id : null;
+    this.modalMode = 'todo-edit';
+    this.formDirty = false;
+    this.metadataCandidates = [];
+
+    document.getElementById('modal-title').textContent = isEdit ? '编辑待办论文' : '新增待办论文';
+    document.getElementById('modal-body').innerHTML = this.renderEditorForm(p);
+    document.getElementById('modal-actions').innerHTML = `
+      <span class="save-status" id="save-status">未修改</span>
+      <button class="btn btn-secondary" onclick="app.closeModal()">取消</button>
+      <button class="btn btn-secondary" id="save-button" onclick="app.saveTodo()">保存到待办</button>
+      <button class="btn btn-primary" onclick="app.saveAndPublishTodo()">推送到文献库</button>
+    `;
+    document.getElementById('modal').classList.add('open');
+    this.initialFormSnapshot = this.getFormSnapshot();
+    this.attachFormDirtyTracking();
+    this.refreshMarkdownPreviews();
+  },
+
   renderEditorForm(p) {
     const sections = ['basic','paper','metadata','content','method','experiment','results','innovation','thinking'];
     let html = `
@@ -2404,6 +3129,7 @@ const app = {
       </div>
       <input type="hidden" id="field-metadata_source" value="${this.escape(p.metadata_source || '')}">
       <input type="hidden" id="field-metadata_checked_at" value="${this.escape(p.metadata_checked_at || '')}">
+      <input type="hidden" id="field-citation_source" value="${this.escape(p.citation_source || '')}">
     `;
 
     // Score section at top
@@ -2438,6 +3164,8 @@ const app = {
           input = this.renderMarkdownField(f, val, 'textarea');
         } else if (f.type === 'date') {
           input = `<input type="date" id="field-${f.key}" value="${val}">`;
+        } else if (f.type === 'number') {
+          input = `<input type="number" id="field-${f.key}" min="0" step="1" value="${val}">`;
         } else {
           input = this.renderMarkdownField(f, val, 'input');
         }
@@ -2518,7 +3246,7 @@ const app = {
     }
     if (resultsEl) resultsEl.innerHTML = '<div class="comment-meta">识别中...</div>';
     try {
-      const data = await apiPost('/api/metadata/search', { query });
+      const data = await apiPost('/api/metadata/search', { query, bypassCache: true });
       this.metadataCandidates = data.candidates || [];
       if (resultsEl) resultsEl.innerHTML = this.renderMetadataCandidates(data);
     } catch(e) {
@@ -2541,11 +3269,15 @@ const app = {
     }
     return candidates.map((candidate, index) => {
       const duplicate = candidate.duplicate || { status: 'none' };
+      const citationCount = getCitationDisplay(candidate);
+      const publishedAt = (candidate.published_at || '').slice(0, 10);
       return `
         <div class="metadata-card">
           <div class="metadata-card-title">${this.escape(candidate.title || '未命名候选')}</div>
           <div class="metadata-card-meta">
             ${this.escape([candidate.authors, candidate.year, candidate.venue, candidate.metadata_source || candidate.source].filter(Boolean).join(' · '))}
+            ${publishedAt ? `<br>发表时间: ${this.escape(publishedAt)}` : ''}
+            ${citationCount ? `<br>引用量: ${citationCount}${candidate.citation_source ? ` (${this.escape(candidate.citation_source)})` : ''}` : ''}
             ${candidate.doi ? `<br>DOI: ${this.escape(candidate.doi)}` : ''}
             ${candidate.arxiv_id ? `<br>arXiv: ${this.escape(candidate.arxiv_id)}` : ''}
             ${candidate.openreview_id ? `<br>OpenReview: ${this.escape(candidate.openreview_id)}` : ''}
@@ -2589,6 +3321,9 @@ const app = {
       doi: candidate.doi,
       arxiv_id: candidate.arxiv_id,
       openreview_id: candidate.openreview_id,
+      published_at: (candidate.published_at || '').slice(0, 10),
+      citation_count: formatCitationCount(candidate.citation_count),
+      citation_source: candidate.citation_source,
       canonical_url: candidate.canonical_url || candidate.url,
       metadata_source: candidate.metadata_source || candidate.source,
       metadata_checked_at: new Date().toISOString()
@@ -2613,6 +3348,9 @@ const app = {
       doi: candidate.doi || existing.doi || '',
       arxiv_id: candidate.arxiv_id || existing.arxiv_id || '',
       openreview_id: candidate.openreview_id || existing.openreview_id || '',
+      published_at: (candidate.published_at || existing.published_at || '').slice(0, 10),
+      citation_count: formatCitationCount(candidate.citation_count) || existing.citation_count || 0,
+      citation_source: candidate.citation_source || existing.citation_source || '',
       metadata_source: candidate.metadata_source || candidate.source || existing.metadata_source || '',
       metadata_checked_at: new Date().toISOString(),
       canonical_url: candidate.canonical_url || candidate.url || existing.canonical_url || '',
@@ -2676,7 +3414,7 @@ const app = {
   },
 
   markFormDirty() {
-    if (this.modalMode !== 'edit') return;
+    if (this.modalMode !== 'edit' && this.modalMode !== 'todo-edit') return;
     this.formDirty = this.getFormSnapshot() !== this.initialFormSnapshot;
     this.setSaveStatus(this.formDirty ? '有未保存修改' : '未修改', this.formDirty ? 'dirty' : '');
   },
@@ -2820,6 +3558,36 @@ const app = {
     location.reload();
   },
 
+  readEditorFormIntoPaper(basePaper, isEdit, actor) {
+    const p = { ...basePaper };
+    ['relevance','novelty','evidence','inspiration','reproducibility'].forEach(k=>{
+      const el = document.getElementById('score-'+k);
+      if (el) p[k] = parseFloat(el.value) || 0;
+    });
+
+    FIELDS_DEF.forEach(f => {
+      const el = document.getElementById('field-'+f.key);
+      if (el) p[f.key] = el.value;
+    });
+    ['metadata_source','metadata_checked_at','citation_source'].forEach(k => {
+      const el = document.getElementById('field-'+k);
+      if (el) p[k] = el.value;
+    });
+    p.citation_count = parseInt(p.citation_count, 10) || 0;
+
+    const categories = Array.from(document.querySelectorAll('input[name="field-categories"]:checked')).map(el => el.value);
+    if (!categories.length) {
+      return { ok: false, error: '请至少选择一个研究方向。' };
+    }
+    p.categories = categories;
+    p.category = categories[0];
+    p.tags = parseList(document.getElementById('field-tags')?.value || '');
+    p.updated_by = actor;
+    if (!p.created_by) p.created_by = actor;
+    p._expected_updated_at = isEdit ? (basePaper.updated_at || '') : '';
+    return { ok: true, paper: p };
+  },
+
   async savePaper() {
     const isEdit = !!this.editingId;
     let p = isEdit ? this.papers.find(x=>x.id===this.editingId) : createEmptyPaper();
@@ -2829,36 +3597,14 @@ const app = {
     if (saveBtn) saveBtn.disabled = true;
     this.setSaveStatus('保存中...', 'saving');
 
-    // Basic scores
-    ['relevance','novelty','evidence','inspiration','reproducibility'].forEach(k=>{
-      const el = document.getElementById('score-'+k);
-      if (el) p[k] = parseFloat(el.value) || 0;
-    });
-
-    // Fields
-    FIELDS_DEF.forEach(f => {
-      const el = document.getElementById('field-'+f.key);
-      if (el) p[f.key] = el.value;
-    });
-    ['metadata_source','metadata_checked_at'].forEach(k => {
-      const el = document.getElementById('field-'+k);
-      if (el) p[k] = el.value;
-    });
-
-    // Category
-    const categories = Array.from(document.querySelectorAll('input[name="field-categories"]:checked')).map(el => el.value);
-    if (!categories.length) {
-      alert('请至少选择一个研究方向。');
+    const readResult = this.readEditorFormIntoPaper(p, isEdit, actor);
+    if (!readResult.ok) {
+      alert(readResult.error);
       if (saveBtn) saveBtn.disabled = false;
       this.setSaveStatus('请选择分类', 'error');
       return;
     }
-    p.categories = categories;
-    p.category = categories[0];
-    p.tags = parseList(document.getElementById('field-tags')?.value || '');
-    p.updated_by = actor;
-    if (!p.created_by) p.created_by = actor;
-    p._expected_updated_at = isEdit ? (p.updated_at || '') : '';
+    p = readResult.paper;
 
     try {
       let saved;
@@ -2888,6 +3634,97 @@ const app = {
       this.setSaveStatus('保存失败', 'error');
     } finally {
       if (saveBtn) saveBtn.disabled = false;
+    }
+  },
+
+  async saveTodo(options = {}) {
+    const isEdit = !!this.editingId;
+    let p = isEdit ? this.todos.find(x=>x.id===this.editingId) : createEmptyPaper();
+    if (!p) return null;
+    const actor = this.getMemberName(false) || this.currentUser;
+    const saveBtn = document.getElementById('save-button');
+    if (saveBtn) saveBtn.disabled = true;
+    this.setSaveStatus('保存中...', 'saving');
+
+    const readResult = this.readEditorFormIntoPaper(p, isEdit, actor);
+    if (!readResult.ok) {
+      alert(readResult.error);
+      if (saveBtn) saveBtn.disabled = false;
+      this.setSaveStatus('请选择分类', 'error');
+      return null;
+    }
+    p = readResult.paper;
+
+    try {
+      let saved;
+      if (isEdit) {
+        saved = await apiPut('/api/todos/' + p.id, p);
+        const idx = this.todos.findIndex(x => x.id === p.id);
+        if (idx >= 0) this.todos[idx] = saved;
+      } else {
+        saved = await apiPost('/api/todos', p);
+        this.todos.unshift(saved);
+        this.editingId = saved.id;
+      }
+      this.saveData();
+      this.formDirty = false;
+      this.initialFormSnapshot = this.getFormSnapshot();
+      this.setSaveStatus('已保存到待办', 'saved');
+      if (!options.keepOpen) {
+        this.closeModal();
+        this.render();
+      }
+      return saved;
+    } catch(e) {
+      alert('保存待办失败: ' + e.message);
+      this.setSaveStatus('保存失败', 'error');
+      return null;
+    } finally {
+      if (saveBtn) saveBtn.disabled = false;
+    }
+  },
+
+  async saveAndPublishTodo() {
+    const saved = await this.saveTodo({ keepOpen: true });
+    if (!saved) return;
+    await this.publishTodo(saved.id, { fromModal: true });
+  },
+
+  async publishTodo(id, options = {}) {
+    const todo = this.todos.find(x => x.id === id);
+    if (!todo) return;
+    if (!options.fromModal && !confirm(`将「${todo.title || '未命名待办论文'}」推送到共享文献库，并从我的待办中移除。继续吗？`)) {
+      return;
+    }
+    try {
+      const actor = this.getMemberName(false) || this.currentUser;
+      const saved = await apiPost('/api/todos/' + id + '/publish', { updated_by: actor });
+      this.todos = this.todos.filter(x => x.id !== id);
+      this.papers.unshift(saved);
+      this.saveData();
+      if (options.fromModal) this.closeModal();
+      this.currentView = 'list';
+      this.currentCategory = 'all';
+      this.renderSidebarNav();
+      this.updateNavCounts();
+      this.render();
+      alert('已推送到文献库。');
+    } catch(e) {
+      alert('推送失败: ' + e.message);
+    }
+  },
+
+  async deleteTodo(id) {
+    const todo = this.todos.find(x => x.id === id);
+    if (!todo) return;
+    if (!confirm(`确定要删除待办「${todo.title || '未命名待办论文'}」吗？`)) return;
+    try {
+      await apiDelete('/api/todos/' + id);
+      this.todos = this.todos.filter(x => x.id !== id);
+      this.saveData();
+      this.render();
+    } catch(e) {
+      alert('删除待办失败: ' + e.message);
     }
   },
 
@@ -2962,7 +3799,7 @@ const app = {
   },
 
   closeModal() {
-    if (this.modalMode === 'edit' && this.formDirty) {
+    if ((this.modalMode === 'edit' || this.modalMode === 'todo-edit') && this.formDirty) {
       if (!confirm('当前表单有未保存修改，确定要关闭吗？')) return;
     }
     document.getElementById('modal').classList.remove('open');
@@ -3068,6 +3905,37 @@ const app = {
     reader.readAsText(file);
   },
 
+  async backfillMetadata() {
+    const overwrite = confirm('批量补全默认只填空值。\n\n点“确定”：重新刷新已有发表时间和引用量。\n点“取消”：只补全空缺字段。');
+    const proceed = confirm(`将${overwrite ? '刷新' : '补全'}最多 100 篇文献的发表时间、引用量、DOI/arXiv 等事实元数据。过程可能需要几十秒，继续吗？`);
+    if (!proceed) return;
+
+    const btn = document.getElementById('backfill-metadata-button');
+    const originalText = btn?.innerHTML || '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '补全中...';
+    }
+
+    try {
+      const result = await apiPost('/api/metadata/backfill', {
+        overwrite,
+        limit: 100
+      });
+      await this.loadData();
+      this.saveData();
+      this.render();
+      alert(`补全完成：扫描 ${result.scanned || 0} 篇，更新 ${result.updated || 0} 篇，未匹配 ${result.noCandidate || 0} 篇，失败 ${result.failed || 0} 篇。\n\n如果仍有缺失，可以再次点击补全元数据。`);
+    } catch(e) {
+      alert('批量补全失败：' + e.message);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      }
+    }
+  },
+
   // ===================== Utils =====================
   escape(str) {
     if (!str) return '';
@@ -3091,6 +3959,25 @@ const app = {
       minute: '2-digit',
       hour12: false
     }).format(date).replace(/\//g, '-');
+  },
+  formatDateOnly(value) {
+    if (!value) return '';
+    const normalized = String(value).trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(normalized)) return normalized.slice(0, 10);
+    const date = new Date(normalized.includes('T') ? normalized : normalized.replace(' ', 'T'));
+    if (Number.isNaN(date.getTime())) return normalized;
+    return new Intl.DateTimeFormat('zh-CN', {
+      timeZone: 'Asia/Shanghai',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(date).replace(/\//g, '-');
+  },
+  formatMetadataValue(key, value) {
+    if (key === 'metadata_checked_at') return this.formatChinaTime(value);
+    if (key === 'published_at') return String(value || '').slice(0, 10);
+    if (key === 'citation_count') return formatCitationCount(value);
+    return value || '';
   },
   nl2br(str) {
     return str.replace(/\n/g, '<br>');

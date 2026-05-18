@@ -8,6 +8,11 @@ import {
   extractOpenReviewId,
   normalizeCandidate,
   normalizeTitle,
+  searchCrossref,
+  searchArxivByTitle,
+  searchMetadata,
+  searchOpenAlex,
+  searchSemanticScholar,
   similarityScore
 } from '../src/metadata.js';
 
@@ -15,6 +20,10 @@ test('classifyMetadataQuery identifies arXiv URLs', () => {
   assert.deepEqual(classifyMetadataQuery('https://arxiv.org/abs/2401.12345'), {
     type: 'arxiv',
     value: '2401.12345'
+  });
+  assert.deepEqual(classifyMetadataQuery('https://arxiv.org/abs/2605.13083'), {
+    type: 'arxiv',
+    value: '2605.13083'
   });
 });
 
@@ -76,6 +85,19 @@ test('similarityScore is high for similar titles', () => {
 
 test('extractArxivId reads arXiv IDs from DOI-like strings', () => {
   assert.equal(extractArxivId('10.48550/arXiv.2401.12345'), '2401.12345');
+  assert.equal(extractArxivId('arXiv ID 2502.19902'), '2502.19902');
+});
+
+test('extractArxivId reads modern arXiv URL variants', () => {
+  assert.equal(extractArxivId('https://arxiv.org/abs/2605.13083'), '2605.13083');
+  assert.equal(extractArxivId('https://arxiv.org/abs/2605.13083v1'), '2605.13083');
+  assert.equal(extractArxivId('https://arxiv.org/pdf/2605.13083.pdf'), '2605.13083');
+  assert.equal(extractArxivId('<https://arxiv.org/abs/2605.13083>'), '2605.13083');
+  assert.equal(extractArxivId('https://arxiv.org/abs/2605.13083?context=cs.RO。'), '2605.13083');
+});
+
+test('extractArxivId ignores non-arXiv DOI suffixes that look similar', () => {
+  assert.equal(extractArxivId('10.1109/cvpr52734.2025.00845'), '');
 });
 
 test('extractOpenReviewId reads IDs from URLs', () => {
@@ -125,6 +147,347 @@ test('normalizeCandidate derives canonical_url from url when absent', () => {
       institutions: ''
     }
   );
+});
+
+test('normalizeCandidate keeps normalized publication and citation metadata when provided', () => {
+  assert.deepEqual(
+    normalizeCandidate({
+      title: 'A Paper',
+      published_at: '2024-05-03',
+      citation_count: '42',
+      citation_source: 'openalex'
+    }),
+    {
+      title: 'A Paper',
+      published_at: '2024-05-03',
+      citation_count: 42,
+      citation_source: 'openalex',
+      doi: '',
+      arxiv_id: '',
+      openreview_id: '',
+      canonical_url: '',
+      authors: '',
+      institutions: ''
+    }
+  );
+});
+
+test('searchOpenAlex maps cited_by_count into citation metadata', async () => {
+  const results = await searchOpenAlex('A Paper', {
+    fetch: async () => new Response(JSON.stringify({
+      results: [{
+        display_name: 'A Paper',
+        publication_date: '2024-05-03',
+        publication_year: 2024,
+        cited_by_count: 17,
+        doi: 'https://doi.org/10.1234/example',
+        primary_location: {
+          source: { display_name: 'Test Journal' }
+        }
+      }]
+    }), { status: 200 })
+  });
+
+  assert.equal(results[0].citation_count, 17);
+  assert.equal(results[0].citation_source, 'openalex');
+  assert.equal(results[0].published_at, '2024-05-03');
+});
+
+test('searchCrossref maps is-referenced-by-count into citation metadata', async () => {
+  const results = await searchCrossref('10.1234/example', 'doi', {
+    fetch: async () => new Response(JSON.stringify({
+      message: {
+        title: ['A Paper'],
+        DOI: '10.1234/example',
+        published: { 'date-parts': [[2024, 5, 3]] },
+        'is-referenced-by-count': 9
+      }
+    }), { status: 200 })
+  });
+
+  assert.equal(results[0].citation_count, 9);
+  assert.equal(results[0].citation_source, 'crossref');
+  assert.equal(results[0].published_at, '2024-05-03');
+});
+
+test('searchSemanticScholar maps publication date and citation count', async () => {
+  const results = await searchSemanticScholar('10.1234/example', 'doi', {
+    fetch: async () => new Response(JSON.stringify({
+      title: 'A Paper',
+      abstract: 'A short abstract.',
+      externalIds: {
+        DOI: '10.1234/example',
+        ArXiv: '2401.12345'
+      },
+      authors: [{ name: 'Ada Lovelace' }],
+      venue: 'Test Conference',
+      year: 2024,
+      publicationDate: '2024-06-01',
+      citationCount: 33,
+      url: 'https://www.semanticscholar.org/paper/example'
+    }), { status: 200 })
+  });
+
+  assert.equal(results[0].citation_count, 33);
+  assert.equal(results[0].citation_source, 'semantic_scholar');
+  assert.equal(results[0].published_at, '2024-06-01');
+  assert.equal(results[0].publication_source, 'semantic_scholar');
+  assert.equal(results[0].doi, '10.1234/example');
+  assert.equal(results[0].arxiv_id, '2401.12345');
+});
+
+test('searchArxivByTitle finds recent arXiv-only papers by title', async () => {
+  const arxivXml = `
+    <feed>
+      <entry>
+        <id>https://arxiv.org/abs/2605.06388</id>
+        <title>Reconstruction or Semantics? What Makes a Latent Space Useful for Robotic World Models</title>
+        <summary>We study latent spaces for robotic world models.</summary>
+        <published>2026-05-07T12:00:00Z</published>
+        <author><name>Nilaksh</name></author>
+      </entry>
+    </feed>
+  `;
+  const results = await searchArxivByTitle('Reconstruction or Semantics? What Makes a Latent Space Useful for Robotic World Models', {
+    fetch: async () => new Response(arxivXml, { status: 200 })
+  });
+
+  assert.equal(results.length, 1);
+  assert.equal(results[0].arxiv_id, '2605.06388');
+  assert.equal(results[0].published_at, '2026-05-07');
+  assert.equal(results[0].metadata_source, 'arxiv');
+});
+
+test('searchMetadata includes arXiv title search for title-only records', async () => {
+  const title = 'Reconstruction or Semantics? What Makes a Latent Space Useful for Robotic World Models';
+  const arxivXml = `
+    <feed>
+      <entry>
+        <id>https://arxiv.org/abs/2605.06388</id>
+        <title>${title}</title>
+        <summary>We study latent spaces for robotic world models.</summary>
+        <published>2026-05-07T12:00:00Z</published>
+        <author><name>Nilaksh</name></author>
+      </entry>
+    </feed>
+  `;
+  const result = await searchMetadata(title, {}, {
+    fetch: async (url) => {
+      const href = String(url);
+      if (href.includes('export.arxiv.org')) {
+        return new Response(arxivXml, { status: 200 });
+      }
+      if (href.includes('api.semanticscholar.org')) {
+        return new Response(JSON.stringify({ data: [] }), { status: 200 });
+      }
+      if (href.includes('api.openalex.org')) {
+        return new Response(JSON.stringify({ results: [] }), { status: 200 });
+      }
+      if (href.includes('api.crossref.org')) {
+        return new Response(JSON.stringify({ message: { items: [] } }), { status: 200 });
+      }
+      throw new Error(`unexpected URL: ${href}`);
+    }
+  });
+
+  assert.equal(result.candidates.length, 1);
+  assert.equal(result.candidates[0].arxiv_id, '2605.06388');
+  assert.equal(result.candidates[0].published_at, '2026-05-07');
+});
+
+test('searchMetadata preserves arXiv page date while using Semantic Scholar citation count', async () => {
+  const arxivXml = `
+    <feed>
+      <entry>
+        <id>https://arxiv.org/abs/2401.12345</id>
+        <title>A Paper</title>
+        <summary>arXiv abstract</summary>
+        <published>2024-01-02T00:30:00Z</published>
+        <author><name>Ada Lovelace</name></author>
+      </entry>
+    </feed>
+  `;
+
+  const result = await searchMetadata('https://arxiv.org/abs/2401.12345', {}, {
+    fetch: async (url) => {
+      const href = String(url);
+      if (href.includes('export.arxiv.org')) {
+        return new Response(arxivXml, { status: 200, headers: { 'content-type': 'application/atom+xml' } });
+      }
+      if (href.includes('api.semanticscholar.org')) {
+        return new Response(JSON.stringify({
+          title: 'A Paper',
+          externalIds: { ArXiv: '2401.12345' },
+          authors: [{ name: 'Ada Lovelace' }],
+          publicationDate: '2024-05-03',
+          citationCount: 11,
+          url: 'https://www.semanticscholar.org/paper/example'
+        }), { status: 200 });
+      }
+      throw new Error(`unexpected URL: ${href}`);
+    }
+  });
+
+  assert.equal(result.candidates.length, 1);
+  assert.equal(result.candidates[0].published_at, '2024-01-01');
+  assert.equal(result.candidates[0].publication_source, 'arxiv');
+  assert.equal(result.candidates[0].citation_count, 11);
+  assert.equal(result.candidates[0].citation_source, 'semantic_scholar');
+});
+
+test('searchMetadata ignores empty cache entries for direct arXiv links', async () => {
+  const arxivXml = `
+    <feed>
+      <entry>
+        <id>https://arxiv.org/abs/2605.13083</id>
+        <title>TouchAnything: A Dataset and Framework for Bimanual Tactile Estimation from Egocentric Video</title>
+        <summary>arXiv abstract</summary>
+        <published>2026-05-13T06:54:36Z</published>
+        <author><name>Jianyi Zhou</name></author>
+      </entry>
+    </feed>
+  `;
+  let arxivFetches = 0;
+  const env = {
+    DB: {
+      prepare(sql) {
+        return {
+          bind() {
+            return {
+              async first() {
+                if (sql.includes('SELECT result_json')) return { result_json: '[]' };
+                return null;
+              },
+              async run() {
+                return {};
+              }
+            };
+          }
+        };
+      }
+    }
+  };
+
+  const result = await searchMetadata('https://arxiv.org/abs/2605.13083', env, {
+    fetch: async (url) => {
+      const href = String(url);
+      if (href.includes('export.arxiv.org')) {
+        arxivFetches += 1;
+        return new Response(arxivXml, { status: 200, headers: { 'content-type': 'application/atom+xml' } });
+      }
+      if (href.includes('api.semanticscholar.org')) {
+        return new Response(JSON.stringify({}), { status: 200 });
+      }
+      throw new Error(`unexpected URL: ${href}`);
+    }
+  });
+
+  assert.equal(result.fromCache, false);
+  assert.equal(arxivFetches, 1);
+  assert.equal(result.candidates.length, 1);
+  assert.equal(result.candidates[0].arxiv_id, '2605.13083');
+});
+
+test('searchMetadata falls back to arXiv abs HTML when Atom API is unavailable', async () => {
+  const absHtml = `
+    <!doctype html>
+    <html>
+      <head>
+        <meta name="citation_title" content="TriRelVLA: Triadic Relational Structure for Generalizable Embodied Manipulation" />
+        <meta name="citation_author" content="Zhou, Hanyu" />
+        <meta name="citation_author" content="Ma, Chuanhao" />
+        <meta name="citation_author" content="Lee, Gim Hee" />
+        <meta name="citation_date" content="2026/05/07" />
+        <meta name="citation_arxiv_id" content="2605.05714" />
+        <meta name="citation_abstract" content="Vision-language-action models perform well on training-seen robotic tasks." />
+      </head>
+      <body><div class="dateline">[Submitted on 7 May 2026]</div></body>
+    </html>
+  `;
+
+  const result = await searchMetadata('https://arxiv.org/abs/2605.05714', {}, {
+    fetch: async (url) => {
+      const href = String(url);
+      if (href.includes('export.arxiv.org')) {
+        return new Response('', { status: 504 });
+      }
+      if (href.includes('arxiv.org/abs/2605.05714')) {
+        return new Response(absHtml, { status: 200, headers: { 'content-type': 'text/html' } });
+      }
+      if (href.includes('api.semanticscholar.org')) {
+        return new Response(JSON.stringify({ message: 'Too Many Requests' }), { status: 429 });
+      }
+      throw new Error(`unexpected URL: ${href}`);
+    }
+  });
+
+  assert.equal(result.candidates.length, 1);
+  assert.equal(result.candidates[0].title, 'TriRelVLA: Triadic Relational Structure for Generalizable Embodied Manipulation');
+  assert.equal(result.candidates[0].arxiv_id, '2605.05714');
+  assert.equal(result.candidates[0].published_at, '2026-05-07');
+  assert.equal(result.candidates[0].authors, 'Zhou, Hanyu; Ma, Chuanhao; Lee, Gim Hee');
+});
+
+test('searchMetadata falls back to title-based citation sources for arXiv records', async () => {
+  const title = 'Optimus-2: Multimodal Minecraft Agent with Goal-Observation-Action Conditioned Policy';
+  const arxivXml = `
+    <feed>
+      <entry>
+        <id>https://arxiv.org/abs/2502.19902</id>
+        <title>${title}</title>
+        <summary>arXiv abstract</summary>
+        <published>2025-02-27T09:18:04Z</published>
+        <author><name>Zaijing Li</name></author>
+      </entry>
+    </feed>
+  `;
+
+  const result = await searchMetadata('https://arxiv.org/abs/2502.19902', {}, {
+    fetch: async (url) => {
+      const href = String(url);
+      const decoded = decodeURIComponent(href);
+      if (href.includes('export.arxiv.org')) {
+        return new Response(arxivXml, { status: 200, headers: { 'content-type': 'application/atom+xml' } });
+      }
+      if (href.includes('api.semanticscholar.org')) {
+        return new Response(JSON.stringify(href.includes('/paper/search') ? { data: [] } : {}), { status: 200 });
+      }
+      if (href.includes('api.openalex.org') && decoded.includes(title)) {
+        return new Response(JSON.stringify({
+          results: [{
+            display_name: title,
+            publication_date: '2025-06-10',
+            publication_year: 2025,
+            cited_by_count: 0,
+            doi: 'https://doi.org/10.1109/cvpr52734.2025.00845'
+          }]
+        }), { status: 200 });
+      }
+      if (href.includes('api.openalex.org')) {
+        return new Response(JSON.stringify({ results: [] }), { status: 200 });
+      }
+      if (href.includes('api.crossref.org')) {
+        return new Response(JSON.stringify({
+          message: {
+            items: [{
+              title: [title],
+              DOI: '10.1109/cvpr52734.2025.00845',
+              published: { 'date-parts': [[2025, 6, 10]] },
+              'is-referenced-by-count': 6
+            }]
+          }
+        }), { status: 200 });
+      }
+      throw new Error(`unexpected URL: ${href}`);
+    }
+  });
+
+  assert.equal(result.candidates.length, 1);
+  assert.equal(result.candidates[0].arxiv_id, '2502.19902');
+  assert.equal(result.candidates[0].published_at, '2025-02-27');
+  assert.equal(result.candidates[0].citation_count, 6);
+  assert.equal(result.candidates[0].citation_source, 'crossref');
+  assert.equal(result.candidates[0].doi, '10.1109/cvpr52734.2025.00845');
 });
 
 test('detectDuplicate reports definite DOI matches before title matches', () => {

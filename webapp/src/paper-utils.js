@@ -46,6 +46,9 @@ export const FIELDS = [
   'doi',
   'arxiv_id',
   'openreview_id',
+  'published_at',
+  'citation_count',
+  'citation_source',
   'metadata_source',
   'metadata_checked_at',
   'canonical_url',
@@ -61,6 +64,10 @@ const SCORE_FIELDS = new Set([
   'evidence',
   'inspiration',
   'reproducibility'
+]);
+
+const NUMBER_FIELDS = new Set([
+  'citation_count'
 ]);
 
 const IDENTIFIER_FIELDS = new Set([
@@ -119,6 +126,10 @@ export function normalizeValue(field, value) {
   if (SCORE_FIELDS.has(field)) {
     const number = Number.parseFloat(value);
     return Number.isFinite(number) ? number : 0;
+  }
+  if (NUMBER_FIELDS.has(field)) {
+    const number = Number.parseInt(value, 10);
+    return Number.isFinite(number) && number >= 0 ? number : 0;
   }
   if (IDENTIFIER_FIELDS.has(field)) {
     return normalizeIdentifier(value);

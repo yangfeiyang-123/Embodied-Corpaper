@@ -424,6 +424,46 @@
   .form-section {
     margin-bottom: 24px;
   }
+  .editor-section {
+    background: rgba(255,255,255,0.72);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 14px;
+    overflow: hidden;
+  }
+  .editor-section[open] {
+    box-shadow: 0 10px 24px rgba(15,23,42,0.06);
+  }
+  .editor-section > summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 46px;
+    padding: 0 14px;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    color: #1d4ed8;
+    font-size: 13px;
+    font-weight: 700;
+    border-bottom: 1px solid transparent;
+  }
+  .editor-section > summary::-webkit-details-marker { display: none; }
+  .editor-section > summary::before {
+    content: "▸";
+    color: #64748b;
+    transition: transform 0.18s ease;
+  }
+  .editor-section[open] > summary {
+    border-bottom-color: #dbeafe;
+    background: linear-gradient(180deg, rgba(248,250,252,0.92), rgba(255,255,255,0.72));
+  }
+  .editor-section[open] > summary::before {
+    transform: rotate(90deg);
+  }
+  .editor-section-body {
+    padding: 16px;
+  }
   .form-section-title {
     font-size: 13px;
     font-weight: 600;
@@ -1279,6 +1319,7 @@
     border-color: transparent;
   }
   .main {
+    min-width: 0;
     background:
       linear-gradient(180deg, rgba(255,255,255,0.62), rgba(246,248,251,0.78)),
       linear-gradient(120deg, rgba(37,99,235,0.04), transparent 38%);
@@ -1597,12 +1638,121 @@
     .content {
       padding: 18px;
     }
+    .dashboard-paper-layout {
+      grid-template-columns: 1fr;
+    }
+    .dashboard-score-panel {
+      position: static;
+      max-height: none;
+    }
   }
   @media (max-width: 768px) {
     .sidebar { width: 220px; }
     .stats-grid { grid-template-columns: 1fr 1fr; }
     .cards-grid { grid-template-columns: 1fr; }
     .card-footer { align-items: flex-start; gap: 10px; flex-direction: column; }
+  }
+  @media (max-width: 640px) {
+    .sidebar {
+      width: 64px;
+      min-width: 64px;
+    }
+    .sidebar-header {
+      padding: 48px 10px 14px;
+    }
+    .sidebar-header h1,
+    .sidebar-header p,
+    .nav-section,
+    .nav-label span:not(.section-toggle),
+    .nav-label button,
+    .nav-item-label,
+    .nav-item .count {
+      display: none;
+    }
+    .sidebar-toggle {
+      right: 18px;
+      transform: rotate(180deg);
+    }
+    .topbar {
+      gap: 8px;
+      align-items: stretch;
+    }
+    .search-box {
+      min-width: 100%;
+      order: -2;
+    }
+    .sort-select {
+      flex: 1 1 100%;
+      min-height: 38px;
+      order: -1;
+    }
+    .topbar .btn {
+      justify-content: center;
+      padding-inline: 10px;
+    }
+    .topbar .btn-secondary {
+      flex: 0 0 42px;
+    }
+    .topbar .btn-secondary .btn-label {
+      display: none;
+    }
+    .topbar .btn-primary {
+      flex: 1 1 auto;
+    }
+    .user-menu {
+      flex: 0 0 42px;
+      justify-content: center;
+      padding-inline: 8px;
+    }
+    #user-name {
+      display: none;
+    }
+    .content {
+      padding: 14px;
+    }
+    .dashboard-paper-layout {
+      gap: 14px;
+    }
+    .dashboard-main-list .paper-card {
+      min-height: 0;
+      padding: 18px;
+    }
+    .dashboard-main-list .card-title {
+      font-size: 16px;
+    }
+    .dashboard-main-list .score-value {
+      font-size: 24px;
+    }
+    .modal-overlay {
+      padding: 10px;
+    }
+    .modal {
+      max-height: calc(100vh - 20px);
+    }
+    .modal-header,
+    .modal-actions {
+      padding-left: 14px;
+      padding-right: 14px;
+    }
+    .modal-actions {
+      flex-wrap: wrap;
+    }
+    .modal-actions .save-status {
+      width: 100%;
+      margin-right: 0;
+    }
+    .modal-actions .btn {
+      flex: 1 1 auto;
+      justify-content: center;
+    }
+    .score-inputs {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      width: 100%;
+    }
+    .score-input input {
+      width: 100%;
+    }
   }
 </style>
 </head>
@@ -1653,15 +1803,15 @@
       </select>
       <button class="btn btn-secondary" onclick="app.exportData()">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        导出
+        <span class="btn-label">导出</span>
       </button>
       <button class="btn btn-secondary" id="backfill-metadata-button" onclick="app.backfillMetadata()">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12a9 9 0 11-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
-        补全元数据
+        <span class="btn-label">补全元数据</span>
       </button>
       <button class="btn btn-secondary" onclick="document.getElementById('import-file').click()">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        导入
+        <span class="btn-label">导入</span>
       </button>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="app.importData(this)">
       <div class="user-menu" id="user-menu" onclick="app.showUserDropdown()" style="display:none;">
@@ -1670,7 +1820,7 @@
       </div>
       <button class="btn btn-primary" onclick="app.openEditor()">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        新增文献
+        <span class="btn-label">新增文献</span>
       </button>
     </div>
 
@@ -3115,9 +3265,11 @@ const app = {
 
   renderEditorForm(p) {
     const sections = ['basic','paper','metadata','content','method','experiment','results','innovation','thinking'];
+    const defaultOpenSections = new Set(['basic', 'paper']);
     let html = `
-      <div class="form-section">
-        <div class="form-section-title">快速识别</div>
+      <details class="editor-section" open>
+        <summary>快速识别</summary>
+        <div class="editor-section-body">
         <div class="identify-panel">
           <div class="identify-row">
             <input type="text" id="metadata-query" placeholder="粘贴 arXiv / DOI / OpenReview / 论文标题">
@@ -3126,15 +3278,17 @@ const app = {
           </div>
           <div class="metadata-results" id="metadata-results"></div>
         </div>
-      </div>
+        </div>
+      </details>
       <input type="hidden" id="field-metadata_source" value="${this.escape(p.metadata_source || '')}">
       <input type="hidden" id="field-metadata_checked_at" value="${this.escape(p.metadata_checked_at || '')}">
       <input type="hidden" id="field-citation_source" value="${this.escape(p.citation_source || '')}">
     `;
 
     // Score section at top
-    html += `<div class="form-section">
-      <div class="form-section-title">五维评分（自动计算综合评分）</div>
+    html += `<details class="editor-section" open>
+      <summary>五维评分（自动计算综合评分）</summary>
+      <div class="editor-section-body">
       <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
         <div class="score-inputs">
           ${Object.entries(RATING_LABELS).map(([key,label])=>`
@@ -3149,12 +3303,15 @@ const app = {
           <div style="font-size:11px;color:var(--text-secondary);">综合评分</div>
         </div>
       </div>
-    </div>`;
+      </div>
+    </details>`;
 
     sections.forEach(sec => {
       const fields = FIELDS_DEF.filter(f => f.section === sec);
       if (!fields.length) return;
-      html += `<div class="form-section"><div class="form-section-title">${SECTION_TITLES[sec]}</div><div class="form-grid">`;
+      html += `<details class="editor-section" ${defaultOpenSections.has(sec) ? 'open' : ''}>
+        <summary>${SECTION_TITLES[sec]}</summary>
+        <div class="editor-section-body"><div class="form-grid">`;
       fields.forEach(f => {
         const val = this.escape(p[f.key] || '');
         let input = '';
@@ -3171,11 +3328,13 @@ const app = {
         }
         html += `<div class="form-field ${f.full?'full':''}"><label>${f.label}</label>${input}</div>`;
       });
-      html += '</div></div>';
+      html += '</div></div></details>';
     });
 
     // Category selector
-    html += `<div class="form-section"><div class="form-section-title">分类</div>
+    html += `<details class="editor-section" open>
+      <summary>分类</summary>
+      <div class="editor-section-body">
       <div class="form-field full"><label>研究方向（可多选）</label>
       <div class="checkbox-grid">
         ${CATEGORIES.map(c=>`
@@ -3191,7 +3350,8 @@ const app = {
         ${this.renderMarkdownField({ key: 'tags', label: '标签' }, this.escape(getPaperTags(p).join(', ')), 'input')}
         <div class="field-hint">用逗号、分号或换行分隔，用于跨分类检索。</div>
       </div>
-    </div>`;
+      </div>
+    </details>`;
 
     return html;
   },

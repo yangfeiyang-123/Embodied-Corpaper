@@ -43,7 +43,8 @@ FIELDS = [
     'baselines','metrics','overallResults','coreEffect','ablation',
     'inferenceSpeed','innovation1','innovation2','innovation3','innovation4',
     'inspirationNote','limitations','newIdeas',
-    'abstract','doi','arxiv_id','openreview_id','metadata_source','metadata_checked_at','canonical_url',
+    'abstract','doi','arxiv_id','openreview_id','published_at','citation_count','citation_source',
+    'metadata_source','metadata_checked_at','canonical_url',
     'created_by','updated_by','created_at','updated_at'
 ]
 
@@ -142,6 +143,9 @@ def init_db():
         'doi': 'TEXT',
         'arxiv_id': 'TEXT',
         'openreview_id': 'TEXT',
+        'published_at': 'TEXT',
+        'citation_count': 'INTEGER DEFAULT 0',
+        'citation_source': 'TEXT',
         'metadata_source': 'TEXT',
         'metadata_checked_at': 'TEXT',
         'canonical_url': 'TEXT'
@@ -171,6 +175,37 @@ def init_db():
     ''')
     conn.execute('CREATE INDEX IF NOT EXISTS idx_comments_paper_id ON comments(paper_id)')
     conn.execute('CREATE INDEX IF NOT EXISTS idx_comments_parent_id ON comments(parent_id)')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_papers_published_at ON papers(published_at)')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_papers_citation_count ON papers(citation_count)')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            created_at TEXT
+        )
+    ''')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS favorites (
+            user_id TEXT NOT NULL,
+            paper_id TEXT NOT NULL,
+            created_at TEXT,
+            PRIMARY KEY (user_id, paper_id)
+        )
+    ''')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_favorites_user_id ON favorites(user_id)')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_favorites_paper_id ON favorites(paper_id)')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS todo_papers (
+            user_id TEXT NOT NULL,
+            id TEXT NOT NULL,
+            payload TEXT NOT NULL,
+            created_at TEXT,
+            updated_at TEXT,
+            PRIMARY KEY (user_id, id)
+        )
+    ''')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_todo_papers_user_updated ON todo_papers(user_id, updated_at)')
     conn.execute("UPDATE papers SET categories = category WHERE (categories IS NULL OR categories = '') AND category IS NOT NULL AND category != ''")
     conn.commit()
     conn.close()
@@ -209,6 +244,23 @@ def row_to_dict(row):
     d['status'] = d.get('status') or '深读中'
     d['favorite'] = '否'
     return d
+
+def todo_row_to_dict(row):
+    try:
+        payload = json.loads(row['payload'] or '{}')
+    except (TypeError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    payload.setdefault('id', row['id'])
+    payload.setdefault('created_at', row['created_at'])
+    payload.setdefault('updated_at', row['updated_at'])
+    payload['favorite'] = '否'
+    return row_to_dict(payload)
+
+def require_username():
+    username = request.headers.get('X-User-Name', '').strip()
+    return username or ''
 
 def comment_to_dict(row):
     d = dict(row)
@@ -340,6 +392,144 @@ def create_paper():
     row = conn.execute('SELECT * FROM papers WHERE id = ?', (paper_id,)).fetchone()
     conn.close()
     return jsonify(row_to_dict(row)), 201
+
+@app.route('/api/todos', methods=['GET'])
+@require_auth
+def list_todos():
+    username = require_username()
+    if not username:
+        return jsonify({'error': 'Login required'}), 401
+    conn = get_db()
+    rows = conn.execute(
+        'SELECT * FROM todo_papers WHERE user_id = ? ORDER BY updated_at DESC',
+        (username,)
+    ).fetchall()
+    conn.close()
+    todos = [todo_row_to_dict(row) for row in rows]
+    return jsonify({'todos': [todo for todo in todos if todo]})
+
+@app.route('/api/todos', methods=['POST'])
+@require_auth
+def create_todo():
+    username = require_username()
+    if not username:
+        return jsonify({'error': 'Login required'}), 401
+    data = request.get_json(force=True) or {}
+    now = datetime.now().isoformat()
+    actor = str(data.get('updated_by') or data.get('created_by') or username).strip() or username
+    data['id'] = data.get('id') or secrets.token_hex(8)
+    data['favorite'] = '否'
+    data['created_by'] = data.get('created_by') or actor
+    data['updated_by'] = actor
+    data['created_at'] = data.get('created_at') or now
+    data['updated_at'] = now
+    todo = normalize_paper(data)
+
+    conn = get_db()
+    conn.execute(
+        'INSERT INTO todo_papers (user_id, id, payload, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+        (username, todo['id'], json.dumps(todo, ensure_ascii=False), todo['created_at'], todo['updated_at'])
+    )
+    conn.commit()
+    conn.close()
+    return jsonify(row_to_dict(todo)), 201
+
+@app.route('/api/todos/<todo_id>', methods=['PUT'])
+@require_auth
+def update_todo(todo_id):
+    username = require_username()
+    if not username:
+        return jsonify({'error': 'Login required'}), 401
+    conn = get_db()
+    row = conn.execute(
+        'SELECT * FROM todo_papers WHERE user_id = ? AND id = ?',
+        (username, todo_id)
+    ).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({'error': 'Not found'}), 404
+
+    existing = todo_row_to_dict(row) or {}
+    data = request.get_json(force=True) or {}
+    now = datetime.now().isoformat()
+    actor = str(data.get('updated_by') or username).strip() or username
+    todo = normalize_paper({
+        **existing,
+        **data,
+        'id': todo_id,
+        'favorite': '否',
+        'created_by': data.get('created_by') or existing.get('created_by') or actor,
+        'updated_by': actor,
+        'created_at': data.get('created_at') or existing.get('created_at') or row['created_at'] or now,
+        'updated_at': now
+    })
+    conn.execute(
+        'UPDATE todo_papers SET payload = ?, updated_at = ? WHERE user_id = ? AND id = ?',
+        (json.dumps(todo, ensure_ascii=False), todo['updated_at'], username, todo_id)
+    )
+    conn.commit()
+    conn.close()
+    return jsonify(row_to_dict(todo))
+
+@app.route('/api/todos/<todo_id>', methods=['DELETE'])
+@require_auth
+def delete_todo(todo_id):
+    username = require_username()
+    if not username:
+        return jsonify({'error': 'Login required'}), 401
+    conn = get_db()
+    conn.execute('DELETE FROM todo_papers WHERE user_id = ? AND id = ?', (username, todo_id))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True})
+
+@app.route('/api/todos/<todo_id>/publish', methods=['POST'])
+@require_auth
+def publish_todo(todo_id):
+    username = require_username()
+    if not username:
+        return jsonify({'error': 'Login required'}), 401
+    conn = get_db()
+    row = conn.execute(
+        'SELECT * FROM todo_papers WHERE user_id = ? AND id = ?',
+        (username, todo_id)
+    ).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({'error': 'Not found'}), 404
+    exists = conn.execute('SELECT id FROM papers WHERE id = ?', (todo_id,)).fetchone()
+    if exists:
+        conn.close()
+        return jsonify({
+            'error': 'Conflict',
+            'message': '文献库中已存在同 ID 的文献，请先另存为新的待办。'
+        }), 409
+
+    data = request.get_json(force=True) or {}
+    draft = todo_row_to_dict(row) or {}
+    now = datetime.now().isoformat()
+    actor = str(data.get('updated_by') or username).strip() or username
+    paper = normalize_paper({
+        **draft,
+        **data,
+        'id': todo_id,
+        'favorite': '否',
+        'created_by': actor,
+        'updated_by': actor,
+        'created_at': now,
+        'updated_at': now
+    })
+
+    fields = FIELDS
+    cols = ', '.join(fields)
+    placeholders = ', '.join(['?'] * len(fields))
+    values = [paper.get(f, '') for f in fields]
+    conn.execute(f'INSERT INTO papers ({cols}) VALUES ({placeholders})', values)
+    conn.execute('DELETE FROM todo_papers WHERE user_id = ? AND id = ?', (username, todo_id))
+    conn.commit()
+    saved = conn.execute('SELECT * FROM papers WHERE id = ?', (todo_id,)).fetchone()
+    conn.close()
+    return jsonify(row_to_dict(saved)), 201
 
 @app.route('/api/papers/<paper_id>', methods=['PUT'])
 @require_auth

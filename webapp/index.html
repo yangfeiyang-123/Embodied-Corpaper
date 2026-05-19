@@ -2042,7 +2042,6 @@ const FIELDS_DEF = [
   { key: 'title', label: '论文标题', section: 'paper', type: 'text', full: true },
   { key: 'source', label: '年份/来源', section: 'paper', type: 'text', full: true },
   { key: 'link', label: '链接/项目页', section: 'paper', type: 'text', full: true },
-  { key: 'direction', label: '方向', section: 'paper', type: 'textarea', full: true, rows: 4 },
   { key: 'oneSentence', label: '一句话定位', section: 'paper', type: 'textarea', full: true, rows: 3 },
   { key: 'authors', label: '作者与机构', section: 'paper', type: 'textarea', full: true, rows: 4 },
   { key: 'abstract', label: '摘要', section: 'metadata', type: 'textarea', full: true },
@@ -3025,7 +3024,6 @@ const app = {
               <strong>作者/机构：</strong>${this.escape(p.authors)||'-'}
             </p>
           </div>
-          ${s('direction','方向','highlight-section')}
           ${s('oneSentence','一句话定位','highlight-section')}
           ${s('task','核心任务','highlight-section')}
           ${s('motivation','问题与动机','highlight-section')}

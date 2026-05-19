@@ -1529,6 +1529,15 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  .paper-tag-toggle {
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .paper-tag-toggle:hover {
+    background: #dff4ff;
+    border-color: rgba(14,165,233,0.34);
+    color: #075985;
+  }
   .paper-date {
     font-size: 11px;
     color: #8a9bb0;
@@ -2260,6 +2269,7 @@ const app = {
   metadataCandidates: [],
   commentsByPaper: {},
   categoryDraft: [],
+  expandedTagCards: new Set(),
   currentUser: CURRENT_USER,
   modalPointerStartedOnOverlay: false,
 
@@ -2930,7 +2940,8 @@ const app = {
 
   renderPaperVisual(p) {
     const tags = getPaperTags(p).map(tag => String(tag).replace(/^#+/, '').trim()).filter(Boolean);
-    const displayTags = tags.length ? tags.slice(0, 3) : ['未标注'];
+    const isExpanded = this.expandedTagCards.has(p.id);
+    const displayTags = tags.length ? (isExpanded ? tags : tags.slice(0, 3)) : ['未标注'];
     const moreCount = Math.max(0, tags.length - displayTags.length);
     const joinedDate = this.formatDateOnly(p.created_at || p.updated_at || p.readDate) || '待整理';
     return `
@@ -2945,12 +2956,21 @@ const app = {
         <div>
           <div class="paper-tags-row">
             ${displayTags.map(tag => `<span class="paper-tag-mini">#${this.escape(tag)}</span>`).join('')}
-            ${moreCount ? `<span class="paper-tag-mini">+${moreCount}</span>` : ''}
+            ${tags.length > 3 ? `<button class="paper-tag-mini paper-tag-toggle" type="button" onclick="event.stopPropagation(); app.togglePaperTags('${this.escapeJs(p.id)}')" title="${isExpanded ? '收起标签' : '展开全部标签'}">${isExpanded ? '收起' : '+' + moreCount}</button>` : ''}
           </div>
           <div class="paper-date">加入日期：${this.escape(joinedDate)}</div>
         </div>
       </div>
     `;
+  },
+
+  togglePaperTags(id) {
+    if (this.expandedTagCards.has(id)) {
+      this.expandedTagCards.delete(id);
+    } else {
+      this.expandedTagCards.add(id);
+    }
+    this.render();
   },
 
   // ===================== Detail View =====================
@@ -4117,6 +4137,13 @@ const app = {
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  },
+  escapeJs(str) {
+    return String(str || '')
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, "\\'")
+      .replace(/\n/g, '\\n')
+      .replace(/\r/g, '\\r');
   },
   formatChinaTime(value) {
     if (!value) return '';

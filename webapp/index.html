@@ -4076,8 +4076,10 @@ const app = {
   },
 
   async backfillMetadata() {
-    const overwrite = confirm('批量补全默认只填空值。\n\n点“确定”：重新刷新已有发表时间和引用量。\n点“取消”：只补全空缺字段。');
-    const proceed = confirm(`将${overwrite ? '刷新' : '补全'}最多 100 篇文献的发表时间、引用量、DOI/arXiv 等事实元数据。过程可能需要几十秒，继续吗？`);
+    const scope = this.currentView === 'todos' ? 'todos' : 'papers';
+    const targetLabel = scope === 'todos' ? '待办论文' : '文献库';
+    const overwrite = confirm(`批量补全${targetLabel}默认只填空值。\n\n点“确定”：重新刷新已有发表时间和引用量。\n点“取消”：只补全空缺字段。`);
+    const proceed = confirm(`将${overwrite ? '刷新' : '补全'}最多 100 篇${targetLabel}里的论文发表时间、引用量、DOI/arXiv 等事实元数据。过程可能需要几十秒，继续吗？`);
     if (!proceed) return;
 
     const btn = document.getElementById('backfill-metadata-button');
@@ -4090,12 +4092,13 @@ const app = {
     try {
       const result = await apiPost('/api/metadata/backfill', {
         overwrite,
+        scope,
         limit: 100
       });
       await this.loadData();
       this.saveData();
       this.render();
-      alert(`补全完成：扫描 ${result.scanned || 0} 篇，更新 ${result.updated || 0} 篇，未匹配 ${result.noCandidate || 0} 篇，失败 ${result.failed || 0} 篇。\n\n如果仍有缺失，可以再次点击补全元数据。`);
+      alert(`${targetLabel}补全完成：扫描 ${result.scanned || 0} 篇，更新 ${result.updated || 0} 篇，未匹配 ${result.noCandidate || 0} 篇，失败 ${result.failed || 0} 篇。\n\n如果仍有缺失，可以再次点击补全元数据。`);
     } catch(e) {
       alert('批量补全失败：' + e.message);
     } finally {

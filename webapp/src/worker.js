@@ -197,9 +197,15 @@ async function backfillMetadataEndpoint(request, env) {
   const overwrite = data.overwrite === true;
   const bypassCache = data.bypassCache === true;
   const limit = clampInteger(data.limit, 1, 200, 100);
+  const scope = data.scope === 'todos' ? 'todos' : 'papers';
   const actor = normalizeActor(request.headers.get('X-User-Name') || data.updated_by || 'metadata-backfill');
-  const result = await env.DB.prepare('SELECT * FROM papers ORDER BY updated_at DESC').all();
-  const papers = normalizeRows(result.results || []);
+  const username = request.headers.get('X-User-Name') || '';
+  if (scope === 'todos' && !username) {
+    return json({ error: 'Login required' }, 401);
+  }
+  const entries = scope === 'todos'
+    ? await loadTodoBackfillEntries(env, username)
+    : await loadPaperBackfillEntries(env);
   const details = [];
   let scanned = 0;
   let updated = 0;
@@ -208,8 +214,9 @@ async function backfillMetadataEndpoint(request, env) {
   let noCandidate = 0;
   let failed = 0;
 
-  for (const paper of papers) {
+  for (const entry of entries) {
     if (scanned >= limit) break;
+    const paper = entry.paper;
     if (!needsMetadataBackfill(paper, overwrite)) {
       skipped += 1;
       continue;
@@ -263,7 +270,11 @@ async function backfillMetadataEndpoint(request, env) {
         continue;
       }
 
-      await applyMetadataBackfill(env, paper, patch, actor);
+      if (scope === 'todos') {
+        await applyTodoMetadataBackfill(env, entry.row, paper, patch, actor, username);
+      } else {
+        await applyMetadataBackfill(env, paper, patch, actor);
+      }
       updated += 1;
       details.push({
         id: paper.id,
@@ -293,8 +304,23 @@ async function backfillMetadataEndpoint(request, env) {
     failed,
     limit,
     overwrite,
+    scope,
     details: details.slice(0, 50)
   });
+}
+
+async function loadPaperBackfillEntries(env) {
+  const result = await env.DB.prepare('SELECT * FROM papers ORDER BY updated_at DESC').all();
+  return normalizeRows(result.results || []).map((paper) => ({ paper, row: null }));
+}
+
+async function loadTodoBackfillEntries(env, username) {
+  const result = await env.DB.prepare(
+    'SELECT * FROM todo_papers WHERE user_id = ? ORDER BY updated_at DESC'
+  ).bind(username).all();
+  return (result.results || [])
+    .map((row) => ({ row, paper: normalizeTodoRow(row) }))
+    .filter((entry) => entry.paper);
 }
 
 async function createPaper(request, env) {
@@ -584,6 +610,22 @@ async function applyMetadataBackfill(env, paper, patch, actor) {
   const sets = [...fields, 'updated_by', 'updated_at'].map((field) => `${field} = ?`).join(', ');
   const values = fields.map((field) => patch[field]);
   await env.DB.prepare(`UPDATE papers SET ${sets} WHERE id = ?`).bind(...values, actor, updatedAt, paper.id).run();
+}
+
+async function applyTodoMetadataBackfill(env, row, paper, patch, actor, username) {
+  const updatedAt = new Date().toISOString();
+  const next = normalizePaper({
+    ...paper,
+    ...patch,
+    id: paper.id || row.id,
+    favorite: '否',
+    created_at: paper.created_at || row.created_at || updatedAt,
+    updated_by: actor,
+    updated_at: updatedAt
+  });
+  await env.DB.prepare(
+    'UPDATE todo_papers SET payload = ?, updated_at = ? WHERE user_id = ? AND id = ?'
+  ).bind(JSON.stringify(next), updatedAt, username, row.id).run();
 }
 
 function clampInteger(value, min, max, fallback) {

@@ -605,6 +605,27 @@ def search_metadata():
         'message': 'Local Flask mode does not perform external metadata lookup. Use Cloudflare Worker mode for recognition.'
     })
 
+@app.route('/api/metadata/backfill', methods=['POST'])
+@require_auth
+def backfill_metadata():
+    data = request.get_json(force=True) or {}
+    scope = 'todos' if data.get('scope') == 'todos' else 'papers'
+    if scope == 'todos' and not require_username():
+        return jsonify({'error': 'Login required'}), 401
+    return jsonify({
+        'scanned': 0,
+        'updated': 0,
+        'skipped': 0,
+        'noQuery': 0,
+        'noCandidate': 0,
+        'failed': 0,
+        'limit': int(data.get('limit') or 100),
+        'overwrite': data.get('overwrite') is True,
+        'scope': scope,
+        'localMode': True,
+        'message': 'Local Flask mode does not perform external metadata backfill. Use Cloudflare Worker mode for recognition.'
+    })
+
 @app.route('/api/papers/<paper_id>/comments', methods=['GET'])
 @require_auth
 def list_comments(paper_id):

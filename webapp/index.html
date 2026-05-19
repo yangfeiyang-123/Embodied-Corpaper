@@ -1147,6 +1147,44 @@
   .paper-card .card-favorite .favorite-btn { color: #e2e8f0; }
   .paper-card .card-favorite .favorite-btn:hover { color: #f59e0b; }
   .paper-card .card-favorite .favorite-btn.on { color: #f59e0b; }
+  .card-tools {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    z-index: 2;
+  }
+  .card-tool-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: 1px solid rgba(148,163,184,0.28);
+    background: rgba(255,255,255,0.9);
+    color: #475569;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+  }
+  .card-tool-btn:hover {
+    background: #eff6ff;
+    color: var(--primary);
+    border-color: rgba(59,130,246,0.36);
+    transform: translateY(-1px);
+  }
+  .card-tools .favorite-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: 1px solid rgba(148,163,184,0.28);
+    background: rgba(255,255,255,0.9);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
 
   /* ===== Confirm Dialog ===== */
   .confirm-overlay {
@@ -1823,10 +1861,6 @@
         <span class="btn-label">导入</span>
       </button>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="app.importData(this)">
-      <button class="btn btn-secondary" onclick="document.getElementById('pdf-import-file').click()">
-        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15h6M9 18h4"/></svg>
-        <span class="btn-label">导入PDF</span>
-      </button>
       <input type="file" id="pdf-import-file" accept=".pdf,application/pdf" style="display:none" onchange="app.importPdfFile(this)">
       <div class="user-menu" id="user-menu" onclick="app.showUserDropdown()" style="display:none;">
         <span class="user-avatar" id="user-avatar">?</span>
@@ -2276,6 +2310,8 @@ const app = {
   expandedTagCards: new Set(),
   currentUser: CURRENT_USER,
   modalPointerStartedOnOverlay: false,
+  pendingPdfImportPaperId: '',
+  pendingPdfImportTodoId: '',
 
   async init() {
     if (!this.currentUser) {
@@ -2792,7 +2828,10 @@ const app = {
     const citationCount = getCitationDisplay(p);
     return `
       <div class="paper-card" onclick="app.openDetail('${p.id}')">
-        <div class="card-favorite">
+        <div class="card-tools">
+          <button class="card-tool-btn" onclick="app.pickPdfForPaper('${p.id}', event)" title="为这篇文献导入PDF">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15h6M9 18h4"/></svg>
+          </button>
           <button class="favorite-btn ${favOn?'on':''}" onclick="event.stopPropagation(); app.toggleFavorite('${p.id}')" title="收藏">
             <svg width="16" height="16" fill="${favOn?'currentColor':'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
           </button>
@@ -2875,6 +2914,9 @@ const app = {
         <div class="card-header">
           <div class="card-title">${this.escape(p.title) || '未命名文献'}</div>
           <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+            <button class="card-tool-btn" onclick="app.pickPdfForPaper('${p.id}', event)" title="为这篇文献导入PDF">
+              <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15h6M9 18h4"/></svg>
+            </button>
             <button class="favorite-btn ${favOn?'on':''}" onclick="event.stopPropagation(); app.toggleFavorite('${p.id}')" title="收藏">
               <svg width="16" height="16" fill="${favOn?'currentColor':'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
             </button>
@@ -2916,7 +2958,12 @@ const app = {
         ${this.renderPaperVisual(p)}
         <div class="card-header">
           <div class="card-title">${this.escape(p.title) || '未命名待办论文'}</div>
-          <div class="card-score"><div class="score-value">${score}</div><div class="score-label">预评分</div></div>
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+            <button class="card-tool-btn" onclick="app.pickPdfForTodo('${p.id}', event)" title="为这篇待办导入PDF">
+              <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15h6M9 18h4"/></svg>
+            </button>
+            <div class="card-score"><div class="score-value">${score}</div><div class="score-label">预评分</div></div>
+          </div>
         </div>
         <div class="card-meta">
           ${categories.slice(0,3).map(c=>`<span class="tag">${this.escape(c)}</span>`).join('')}
@@ -3247,6 +3294,7 @@ const app = {
   openEditor(id, draft = null) {
     const isEdit = !!id;
     let p = isEdit ? this.papers.find(x=>x.id===id) : (draft ? { ...createEmptyPaper(), ...draft } : createEmptyPaper());
+    if (isEdit && draft && p) p = this.mergePdfDraftIntoPaper(p, draft);
     if (!p) p = createEmptyPaper();
     if (isEdit) this.editingId = id;
     else this.editingId = null;
@@ -3267,9 +3315,10 @@ const app = {
     this.refreshMarkdownPreviews();
   },
 
-  openTodoEditor(id) {
+  openTodoEditor(id, draft = null) {
     const isEdit = !!id;
-    let p = isEdit ? this.todos.find(x=>x.id===id) : createEmptyPaper();
+    let p = isEdit ? this.todos.find(x=>x.id===id) : (draft ? { ...createEmptyPaper(), ...draft } : createEmptyPaper());
+    if (isEdit && draft && p) p = this.mergePdfDraftIntoPaper(p, draft);
     if (!p) p = createEmptyPaper();
     if (!isEdit) {
       p.status = '未读';
@@ -4098,6 +4147,22 @@ const app = {
     reader.readAsText(file);
   },
 
+  pickPdfForPaper(id, event) {
+    if (event) event.stopPropagation();
+    this.pendingPdfImportPaperId = id;
+    this.pendingPdfImportTodoId = '';
+    const input = document.getElementById('pdf-import-file');
+    if (input) input.click();
+  },
+
+  pickPdfForTodo(id, event) {
+    if (event) event.stopPropagation();
+    this.pendingPdfImportTodoId = id;
+    this.pendingPdfImportPaperId = '';
+    const input = document.getElementById('pdf-import-file');
+    if (input) input.click();
+  },
+
   async importPdfFile(input) {
     const file = input.files[0];
     if (!file) return;
@@ -4109,14 +4174,41 @@ const app = {
 
     try {
       const draft = await this.createPaperDraftFromPdf(file);
-      this.openEditor(null, draft);
-      this.setSaveStatus('已从 PDF 生成草稿，请检查后保存', 'dirty');
+      const targetId = this.pendingPdfImportPaperId || '';
+      const targetTodoId = this.pendingPdfImportTodoId || '';
+      this.pendingPdfImportPaperId = '';
+      this.pendingPdfImportTodoId = '';
+      if (targetId) {
+        this.openEditor(targetId, draft);
+        this.setSaveStatus('已从 PDF 补全文献信息，请检查后保存', 'dirty');
+      } else if (targetTodoId) {
+        this.openTodoEditor(targetTodoId, draft);
+        this.setSaveStatus('已从 PDF 补全待办信息，请检查后保存', 'dirty');
+      } else {
+        this.openEditor(null, draft);
+        this.setSaveStatus('已从 PDF 生成草稿，请检查后保存', 'dirty');
+      }
       this.formDirty = true;
     } catch (err) {
       alert('导入 PDF 失败：' + err.message);
     } finally {
+      this.pendingPdfImportPaperId = '';
+      this.pendingPdfImportTodoId = '';
       input.value = '';
     }
+  },
+
+  mergePdfDraftIntoPaper(paper, draft) {
+    const next = { ...paper };
+    ['title', 'authors', 'doi', 'arxiv_id', 'canonical_url', 'link', 'source'].forEach(key => {
+      if (!String(next[key] || '').trim() && String(draft[key] || '').trim()) {
+        next[key] = draft[key];
+      }
+    });
+    next.metadata_source = draft.metadata_source || next.metadata_source || '';
+    next.metadata_checked_at = draft.metadata_checked_at || next.metadata_checked_at || '';
+    next.tags = parseList([...(parseList(next.tags)), ...(parseList(draft.tags))]);
+    return next;
   },
 
   async createPaperDraftFromPdf(file) {

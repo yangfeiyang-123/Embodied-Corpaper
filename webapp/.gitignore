@@ -1,6 +1,8 @@
 node_modules/
+.venv/
 .wrangler/
 *.pyc
 __pycache__/
 papers.db
 .env
+.DS_Store

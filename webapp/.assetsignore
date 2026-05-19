@@ -12,9 +12,11 @@ wrangler.jsonc
 .gitignore
 .git/
 node_modules/
+.venv/
 .wrangler/
 src/
 migrations/
 test/
 *.pyc
 __pycache__/
+.DS_Store

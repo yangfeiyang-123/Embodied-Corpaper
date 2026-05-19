@@ -2261,6 +2261,7 @@ const app = {
   commentsByPaper: {},
   categoryDraft: [],
   currentUser: CURRENT_USER,
+  modalPointerStartedOnOverlay: false,
 
   async init() {
     if (!this.currentUser) {
@@ -2392,9 +2393,18 @@ const app = {
     // Sort
     document.getElementById('sort-select').addEventListener('change', () => this.render());
 
-    // Modal click outside
-    document.getElementById('modal').addEventListener('click', e => {
-      if (e.target.id === 'modal') this.closeModal();
+    // Modal click outside. Track where the pointer starts so text selection
+    // drags from inside the form cannot accidentally close the editor.
+    const modalOverlay = document.getElementById('modal');
+    modalOverlay.addEventListener('pointerdown', e => {
+      this.modalPointerStartedOnOverlay = e.target === modalOverlay;
+    });
+    modalOverlay.addEventListener('click', e => {
+      const selectedText = window.getSelection?.().toString() || '';
+      if (e.target === modalOverlay && this.modalPointerStartedOnOverlay && !selectedText.trim()) {
+        this.closeModal();
+      }
+      this.modalPointerStartedOnOverlay = false;
     });
 
     // Confirm overlay click outside

@@ -7,6 +7,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='15' y1='15' x2='88' y2='90'%3E%3Cstop stop-color='%2306b6d4'/%3E%3Cstop offset='0.55' stop-color='%233b82f6'/%3E%3Cstop offset='1' stop-color='%2310b981'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='24' fill='%23081424'/%3E%3Cpath d='M23 68c10-6 20-6 30 0V31c-10-6-20-6-30 0v37Z' fill='none' stroke='url(%23g)' stroke-width='6' stroke-linejoin='round'/%3E%3Cpath d='M77 68c-10-6-20-6-30 0V31c10-6 20-6 30 0v37Z' fill='none' stroke='%23e0f2fe' stroke-width='6' stroke-linejoin='round'/%3E%3Cpath d='M41 46h18M50 37v18M37 57l9-9M63 57l-9-9' stroke='%2306b6d4' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='37' r='5' fill='%2310b981'/%3E%3Ccircle cx='37' cy='57' r='4' fill='%233b82f6'/%3E%3Ccircle cx='63' cy='57' r='4' fill='%23f59e0b'/%3E%3C/svg%3E">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <style>
   :root {
     --bg: #f5f6fa;
@@ -1185,6 +1186,231 @@
     align-items: center;
     justify-content: center;
   }
+  .paper-card.drag-over {
+    border-color: rgba(37,99,235,0.72);
+    box-shadow: 0 18px 34px rgba(37,99,235,0.18);
+    transform: translateY(-3px);
+  }
+  .paper-card.drag-over::after {
+    content: "松开以导入 PDF";
+    position: absolute;
+    inset: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px dashed rgba(37,99,235,0.55);
+    border-radius: 10px;
+    background: rgba(239,246,255,0.88);
+    color: #1d4ed8;
+    font-size: 13px;
+    font-weight: 750;
+    z-index: 3;
+    pointer-events: none;
+  }
+  .pdf-attachment {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 220px;
+    border: 1px solid rgba(37,99,235,0.16);
+    background: #eff6ff;
+    color: #1d4ed8;
+    border-radius: 7px;
+    padding: 3px 8px;
+    font-size: 11px;
+    font-weight: 750;
+    cursor: pointer;
+  }
+  .pdf-attachment:hover {
+    border-color: rgba(37,99,235,0.36);
+    background: #dbeafe;
+  }
+  .pdf-attachment span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ===== Reader ===== */
+  .reader-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 320;
+    display: none;
+    background: rgba(8,17,31,0.62);
+    backdrop-filter: blur(10px);
+    padding: 18px;
+  }
+  .reader-overlay.open {
+    display: block;
+  }
+  .reader-shell {
+    height: 100%;
+    background: #f8fafc;
+    border: 1px solid rgba(219,229,239,0.88);
+    border-radius: 12px;
+    box-shadow: 0 24px 60px rgba(8,17,31,0.28);
+    display: grid;
+    grid-template-rows: 54px minmax(0, 1fr);
+    overflow: hidden;
+  }
+  .reader-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 0 16px;
+    border-bottom: 1px solid rgba(219,229,239,0.88);
+    background: rgba(255,255,255,0.94);
+  }
+  .reader-title {
+    min-width: 0;
+    font-size: 14px;
+    font-weight: 750;
+    color: #112238;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .reader-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .reader-body {
+    min-height: 0;
+    display: grid;
+    grid-template-rows: var(--reader-top-height, 34%) 8px minmax(0, 1fr);
+  }
+  .reader-record {
+    overflow-y: auto;
+    padding: 18px;
+    background: #fff;
+  }
+  .reader-record-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.85fr);
+    gap: 16px;
+  }
+  .reader-record-section {
+    border: 1px solid rgba(219,229,239,0.9);
+    border-radius: 10px;
+    padding: 12px;
+    background: rgba(248,250,252,0.74);
+  }
+  .reader-record-section h3 {
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+  .reader-record-section h4 {
+    font-size: 11px;
+    color: #667891;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.2px;
+  }
+  .reader-record-section p,
+  .reader-record-section .markdown-body {
+    color: #334155;
+    font-size: 13px;
+    line-height: 1.65;
+  }
+  .reader-resizer {
+    cursor: row-resize;
+    background: linear-gradient(180deg, #e2e8f0, #cbd5e1);
+    position: relative;
+  }
+  .reader-resizer::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 48px;
+    height: 3px;
+    border-radius: 99px;
+    background: #94a3b8;
+    transform: translate(-50%, -50%);
+  }
+  .reader-pdf-panel {
+    min-height: 0;
+    display: grid;
+    grid-template-rows: 46px minmax(0, 1fr);
+    background: #e8eef6;
+  }
+  .reader-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    background: #f8fafc;
+    border-bottom: 1px solid rgba(203,213,225,0.9);
+  }
+  .highlight-colors {
+    display: inline-flex;
+    gap: 6px;
+  }
+  .highlight-swatch {
+    width: 22px;
+    height: 22px;
+    border: 2px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .highlight-swatch.active {
+    border-color: #0f172a;
+  }
+  .pdf-scroll {
+    overflow: auto;
+    padding: 18px 0 32px;
+  }
+  .pdf-page {
+    position: relative;
+    width: max-content;
+    margin: 0 auto 18px;
+    background: white;
+    box-shadow: 0 12px 30px rgba(15,23,42,0.16);
+  }
+  .pdf-page canvas {
+    display: block;
+  }
+  .highlight-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .pdf-highlight,
+  .pdf-highlight-draft {
+    position: absolute;
+    border-radius: 2px;
+    mix-blend-mode: multiply;
+    pointer-events: auto;
+  }
+  .pdf-highlight {
+    cursor: pointer;
+  }
+  .pdf-highlight:hover {
+    outline: 2px solid rgba(15,23,42,0.38);
+  }
+  .pdf-highlight-draft {
+    outline: 1px dashed rgba(15,23,42,0.48);
+    pointer-events: none;
+  }
+  .reader-empty {
+    padding: 28px;
+    text-align: center;
+    color: #64748b;
+  }
+  @media (max-width: 760px) {
+    .reader-overlay { padding: 8px; }
+    .reader-shell { border-radius: 8px; }
+    .reader-header { padding: 0 10px; }
+    .reader-actions .btn:first-child { display: none; }
+    .reader-record-grid { grid-template-columns: 1fr; }
+    .reader-toolbar { flex-wrap: wrap; height: auto; align-content: center; }
+    .reader-pdf-panel { grid-template-rows: auto minmax(0, 1fr); }
+  }
 
   /* ===== Confirm Dialog ===== */
   .confirm-overlay {
@@ -1955,7 +2181,46 @@
   </div>
 </div>
 
+<!-- PDF Reader -->
+<div class="reader-overlay" id="reader-overlay">
+  <div class="reader-shell">
+    <div class="reader-header">
+      <div class="reader-title" id="reader-title">PDF 阅读器</div>
+      <div class="reader-actions">
+        <button class="btn btn-secondary btn-sm" onclick="app.fitReaderPdf()">适配宽度</button>
+        <button class="btn btn-secondary btn-sm" onclick="app.closePdfReader()">关闭</button>
+      </div>
+    </div>
+    <div class="reader-body" id="reader-body">
+      <div class="reader-record" id="reader-record"></div>
+      <div class="reader-resizer" id="reader-resizer" title="拖动调整上下比例"></div>
+      <div class="reader-pdf-panel">
+        <div class="reader-toolbar">
+          <button class="btn btn-secondary btn-sm" id="highlight-toggle" onclick="app.toggleHighlightMode()">高亮标注</button>
+          <div class="highlight-colors" id="highlight-colors">
+            <button class="highlight-swatch active" style="background:#fde047;" onclick="app.setHighlightColor('#fde047')" title="黄色"></button>
+            <button class="highlight-swatch" style="background:#86efac;" onclick="app.setHighlightColor('#86efac')" title="绿色"></button>
+            <button class="highlight-swatch" style="background:#93c5fd;" onclick="app.setHighlightColor('#93c5fd')" title="蓝色"></button>
+            <button class="highlight-swatch" style="background:#fda4af;" onclick="app.setHighlightColor('#fda4af')" title="粉色"></button>
+          </div>
+          <span class="field-hint">开启后在 PDF 页面拖拽即可标注；点击已有高亮可删除。</span>
+        </div>
+        <div class="pdf-scroll" id="pdf-scroll"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
+if (window.pdfjsLib) {
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+}
+
+const PDF_DB_NAME = 'embodied-paper-pdfs';
+const PDF_DB_VERSION = 1;
+const PDF_STORE = 'pdfs';
+const HIGHLIGHT_COLORS = ['#fde047', '#86efac', '#93c5fd', '#fda4af'];
+
 // ===================== Markdown Renderer =====================
 function renderMarkdown(text) {
   if (!text) return '';
@@ -2312,6 +2577,15 @@ const app = {
   modalPointerStartedOnOverlay: false,
   pendingPdfImportPaperId: '',
   pendingPdfImportTodoId: '',
+  pdfDb: null,
+  pdfBindings: {},
+  currentReader: null,
+  currentPdfDoc: null,
+  currentPdfScale: 1.25,
+  highlightMode: false,
+  highlightColor: '#fde047',
+  highlightDraft: null,
+  readerResizeState: null,
 
   async init() {
     if (!this.currentUser) {
@@ -2321,6 +2595,8 @@ const app = {
     document.getElementById('login-overlay').classList.add('hidden');
     this.updateUserUI();
     await this.loadData();
+    await this.initPdfStore();
+    await this.loadPdfIndex();
     this.applySidebarState();
     this.renderSidebarNav();
     this.setupEvents();
@@ -2344,6 +2620,101 @@ const app = {
       console.warn('Failed to load todos:', e);
       this.todos = [];
     }
+  },
+
+  pdfKey(scope, id) {
+    return `${scope}:${id}`;
+  },
+
+  async initPdfStore() {
+    if (!window.indexedDB) {
+      console.warn('IndexedDB is not available; PDF attachments are disabled.');
+      return;
+    }
+    this.pdfDb = await new Promise((resolve, reject) => {
+      const request = indexedDB.open(PDF_DB_NAME, PDF_DB_VERSION);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(PDF_STORE)) {
+          db.createObjectStore(PDF_STORE, { keyPath: 'key' });
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    }).catch(error => {
+      console.warn('Failed to initialize PDF store:', error);
+      return null;
+    });
+  },
+
+  async loadPdfIndex() {
+    if (!this.pdfDb) return;
+    const records = await this.pdfStoreRequest('readonly', store => store.getAll()).catch(error => {
+      console.warn('Failed to load PDF index:', error);
+      return [];
+    });
+    this.pdfBindings = {};
+    for (const record of records || []) {
+      this.pdfBindings[record.key] = {
+        key: record.key,
+        scope: record.scope,
+        id: record.id,
+        fileName: record.fileName,
+        size: record.size,
+        updatedAt: record.updatedAt,
+        annotationCount: Array.isArray(record.annotations) ? record.annotations.length : 0
+      };
+    }
+  },
+
+  pdfStoreRequest(mode, operation) {
+    if (!this.pdfDb) return Promise.reject(new Error('PDF store unavailable'));
+    return new Promise((resolve, reject) => {
+      const tx = this.pdfDb.transaction(PDF_STORE, mode);
+      const store = tx.objectStore(PDF_STORE);
+      const request = operation(store);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+      tx.onerror = () => reject(tx.error);
+    });
+  },
+
+  async getPdfRecord(scope, id) {
+    return this.pdfStoreRequest('readonly', store => store.get(this.pdfKey(scope, id)));
+  },
+
+  async savePdfRecord(record) {
+    await this.pdfStoreRequest('readwrite', store => store.put(record));
+    await this.loadPdfIndex();
+  },
+
+  async deletePdfRecord(scope, id) {
+    if (!this.pdfDb) return;
+    await this.pdfStoreRequest('readwrite', store => store.delete(this.pdfKey(scope, id))).catch(error => {
+      console.warn('Failed to delete PDF record:', error);
+    });
+    await this.loadPdfIndex();
+  },
+
+  async movePdfRecord(fromScope, toScope, id) {
+    const existing = await this.getPdfRecord(fromScope, id).catch(() => null);
+    if (!existing) return;
+    await this.savePdfRecord({
+      ...existing,
+      key: this.pdfKey(toScope, id),
+      scope: toScope,
+      id,
+      updatedAt: new Date().toISOString()
+    });
+    await this.deletePdfRecord(fromScope, id);
+  },
+
+  getPdfBinding(scope, id) {
+    return this.pdfBindings[this.pdfKey(scope, id)] || null;
+  },
+
+  hasPdf(scope, id) {
+    return Boolean(this.getPdfBinding(scope, id));
   },
 
   async syncStats() {
@@ -2462,10 +2833,17 @@ const app = {
       if (e.target.id === 'confirm-overlay') this.cancelDelete();
     });
 
+    const readerResizer = document.getElementById('reader-resizer');
+    readerResizer?.addEventListener('pointerdown', e => this.startReaderResize(e));
+    document.addEventListener('pointermove', e => this.resizeReader(e));
+    document.addEventListener('pointerup', () => this.stopReaderResize());
+
     // ESC to close modals
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
-        if (document.getElementById('confirm-overlay').classList.contains('open')) {
+        if (document.getElementById('reader-overlay').classList.contains('open')) {
+          this.closePdfReader();
+        } else if (document.getElementById('confirm-overlay').classList.contains('open')) {
           this.cancelDelete();
         } else if (document.getElementById('modal').classList.contains('open')) {
           this.closeModal();
@@ -2826,9 +3204,13 @@ const app = {
     const favOn = p.favorite === '是';
     const publishedAt = getPublicationDate(p);
     const citationCount = getCitationDisplay(p);
+    const pdf = this.getPdfBinding('paper', p.id);
     return `
-      <div class="paper-card" onclick="app.openDetail('${p.id}')">
+      <div class="paper-card" onclick="app.openDetail('${p.id}')" ondragover="app.handleCardDragOver(event)" ondragleave="app.handleCardDragLeave(event)" ondrop="app.handlePdfDrop(event, 'paper', '${this.escapeJs(p.id)}')">
         <div class="card-tools">
+          ${pdf ? `<button class="card-tool-btn" onclick="app.openPdfReader('paper', '${this.escapeJs(p.id)}', event)" title="阅读 ${this.escape(pdf.fileName)}">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>` : ''}
           <button class="card-tool-btn" onclick="app.pickPdfForPaper('${p.id}', event)" title="为这篇文献导入PDF">
             <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15h6M9 18h4"/></svg>
           </button>
@@ -2846,6 +3228,7 @@ const app = {
           <span class="tag gray">${this.escape(p.status || '深读中')}</span>
           ${publishedAt ? `<span class="tag green">发表 ${this.escape(publishedAt)}</span>` : ''}
           ${citationCount ? `<span class="tag orange">引用 ${citationCount}</span>` : ''}
+          ${this.renderPdfAttachment('paper', p.id)}
         </div>
         <div class="card-summary">${renderMarkdownInline(p.oneSentence) || '暂无一句话定位'}</div>
         <div class="card-footer">
@@ -2908,12 +3291,16 @@ const app = {
     const favOn = p.favorite === '是';
     const publishedAt = getPublicationDate(p);
     const citationCount = getCitationDisplay(p);
+    const pdf = this.getPdfBinding('paper', p.id);
     return `
-      <div class="paper-card" onclick="app.openDetail('${p.id}')">
+      <div class="paper-card" onclick="app.openDetail('${p.id}')" ondragover="app.handleCardDragOver(event)" ondragleave="app.handleCardDragLeave(event)" ondrop="app.handlePdfDrop(event, 'paper', '${this.escapeJs(p.id)}')">
         ${this.renderPaperVisual(p)}
         <div class="card-header">
           <div class="card-title">${this.escape(p.title) || '未命名文献'}</div>
           <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+            ${pdf ? `<button class="card-tool-btn" onclick="app.openPdfReader('paper', '${this.escapeJs(p.id)}', event)" title="阅读 ${this.escape(pdf.fileName)}">
+              <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>` : ''}
             <button class="card-tool-btn" onclick="app.pickPdfForPaper('${p.id}', event)" title="为这篇文献导入PDF">
               <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15h6M9 18h4"/></svg>
             </button>
@@ -2932,6 +3319,7 @@ const app = {
           ${citationCount ? `<span class="tag orange">引用 ${citationCount}</span>` : ''}
           ${p.shared==='是' ? '<span class="tag orange">已分享</span>' : ''}
           ${tags.slice(0,2).map(t=>`<span class="tag gray">#${this.escape(t)}</span>`).join('')}
+          ${this.renderPdfAttachment('paper', p.id)}
         </div>
         <div class="card-summary">${renderMarkdownInline(p.oneSentence) || '暂无一句话定位'}</div>
         <div class="card-footer">
@@ -2953,12 +3341,16 @@ const app = {
     const tags = getPaperTags(p);
     const publishedAt = getPublicationDate(p);
     const citationCount = getCitationDisplay(p);
+    const pdf = this.getPdfBinding('todo', p.id);
     return `
-      <div class="paper-card" onclick="app.openTodoEditor('${p.id}')">
+      <div class="paper-card" onclick="app.openTodoEditor('${p.id}')" ondragover="app.handleCardDragOver(event)" ondragleave="app.handleCardDragLeave(event)" ondrop="app.handlePdfDrop(event, 'todo', '${this.escapeJs(p.id)}')">
         ${this.renderPaperVisual(p)}
         <div class="card-header">
           <div class="card-title">${this.escape(p.title) || '未命名待办论文'}</div>
           <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+            ${pdf ? `<button class="card-tool-btn" onclick="app.openPdfReader('todo', '${this.escapeJs(p.id)}', event)" title="阅读 ${this.escape(pdf.fileName)}">
+              <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>` : ''}
             <button class="card-tool-btn" onclick="app.pickPdfForTodo('${p.id}', event)" title="为这篇待办导入PDF">
               <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15h6M9 18h4"/></svg>
             </button>
@@ -2972,6 +3364,7 @@ const app = {
           ${publishedAt ? `<span class="tag green">发表 ${this.escape(publishedAt)}</span>` : ''}
           ${citationCount ? `<span class="tag orange">引用 ${citationCount}</span>` : ''}
           ${tags.slice(0,2).map(t=>`<span class="tag gray">#${this.escape(t)}</span>`).join('')}
+          ${this.renderPdfAttachment('todo', p.id)}
         </div>
         <div class="card-summary">${renderMarkdownInline(p.oneSentence || p.abstract) || '可以先记录标题、链接、摘要或待读原因。'}</div>
         <div class="card-footer">
@@ -2986,6 +3379,17 @@ const app = {
           </div>
         </div>
       </div>
+    `;
+  },
+
+  renderPdfAttachment(scope, id) {
+    const pdf = this.getPdfBinding(scope, id);
+    if (!pdf) return '';
+    return `
+      <button class="pdf-attachment" type="button" onclick="app.openPdfReader('${scope}', '${this.escapeJs(id)}', event)" title="打开 ${this.escape(pdf.fileName)}">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span>${this.escape(pdf.fileName || 'PDF')}</span>
+      </button>
     `;
   },
 
@@ -3049,6 +3453,7 @@ const app = {
     const tags = getPaperTags(p);
     const publishedAt = getPublicationDate(p);
     const citationCount = getCitationDisplay(p);
+    const pdf = this.getPdfBinding('paper', p.id);
     const s = (key, label, extraClass = '') => p[key] ? `<div class="detail-section ${extraClass}"><h4>${label}</h4><div class="markdown-body">${renderMarkdown(p[key])}</div></div>` : '';
     return `
       <div class="detail-meta-grid">
@@ -3057,6 +3462,10 @@ const app = {
             <h4>论文标题</h4>
             <p style="font-size:15px;font-weight:600;">${this.escape(p.title)||'未命名'}</p>
             ${p.link ? `<a class="link-btn" href="${this.escape(p.link)}" target="_blank">查看项目页 →</a>` : ''}
+            ${pdf ? `<button class="pdf-attachment" style="margin-top:10px;" type="button" onclick="app.openPdfReader('paper', '${this.escapeJs(p.id)}', event)" title="打开 ${this.escape(pdf.fileName)}">
+              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <span>${this.escape(pdf.fileName || 'PDF')}</span>
+            </button>` : ''}
           </div>
           <div class="detail-section">
             <h4>基础信息</h4>
@@ -3943,6 +4352,7 @@ const app = {
       const saved = await apiPost('/api/todos/' + id + '/publish', { updated_by: actor });
       this.todos = this.todos.filter(x => x.id !== id);
       this.papers.unshift(saved);
+      await this.movePdfRecord('todo', 'paper', id);
       this.saveData();
       if (options.fromModal) this.closeModal();
       this.currentView = 'list';
@@ -3963,6 +4373,7 @@ const app = {
     try {
       await apiDelete('/api/todos/' + id);
       this.todos = this.todos.filter(x => x.id !== id);
+      await this.deletePdfRecord('todo', id);
       this.saveData();
       this.render();
     } catch(e) {
@@ -3997,6 +4408,7 @@ const app = {
     try {
       await apiDelete('/api/papers/' + id);
       this.papers = this.papers.filter(p=>p.id!==id);
+      await this.deletePdfRecord('paper', id);
       this.saveData();
       this.closeModal();
       this.render();
@@ -4050,6 +4462,325 @@ const app = {
     this.modalMode = 'none';
     this.formDirty = false;
     this.initialFormSnapshot = '';
+  },
+
+  // ===================== PDF Reader =====================
+  async openPdfReader(scope, id, event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    if (!window.pdfjsLib) {
+      alert('PDF 阅读器加载失败，请刷新页面后重试。');
+      return;
+    }
+    const record = await this.getPdfRecord(scope, id).catch(() => null);
+    if (!record?.blob) {
+      alert('这张卡片还没有绑定本地 PDF。请先拖入或导入 PDF 文件。');
+      return;
+    }
+    const paper = scope === 'todo'
+      ? this.todos.find(item => item.id === id)
+      : this.papers.find(item => item.id === id);
+    if (!paper) {
+      alert('没有找到对应的文献记录。');
+      return;
+    }
+
+    this.currentReader = {
+      scope,
+      id,
+      paper,
+      record,
+      annotations: Array.isArray(record.annotations) ? [...record.annotations] : []
+    };
+    this.highlightMode = false;
+    this.updateHighlightToggle();
+    document.getElementById('reader-title').textContent = `${paper.title || '未命名文献'} · ${record.fileName || 'PDF'}`;
+    document.getElementById('reader-record').innerHTML = this.renderReaderRecord(scope, paper, record);
+    const savedTop = localStorage.getItem('embodied_reader_top_height');
+    document.getElementById('reader-body').style.setProperty('--reader-top-height', savedTop || '34%');
+    document.getElementById('reader-overlay').classList.add('open');
+    await this.renderPdfDocument(record.blob, { fitWidth: true });
+  },
+
+  renderReaderRecord(scope, p, record) {
+    const categories = getPaperCategories(p);
+    const tags = getPaperTags(p);
+    const score = computeScore(p);
+    const publishedAt = getPublicationDate(p) || '-';
+    const citationCount = getCitationDisplay(p) || '-';
+    const editCall = scope === 'todo'
+      ? `app.closePdfReader(); app.openTodoEditor('${this.escapeJs(p.id)}')`
+      : `app.closePdfReader(); app.openEditor('${this.escapeJs(p.id)}')`;
+    const s = (label, value) => value ? `<div class="reader-record-section"><h4>${label}</h4><div class="markdown-body">${renderMarkdown(value)}</div></div>` : '';
+    return `
+      <div class="reader-record-grid">
+        <div class="reader-record-section">
+          <h3>${this.escape(p.title || '未命名文献')}</h3>
+          <p>
+            <strong>分类：</strong>${categories.map(c => this.escape(c)).join(' / ') || '-'}<br>
+            <strong>标签：</strong>${tags.length ? tags.map(t => '#' + this.escape(t)).join(' ') : '-'}<br>
+            <strong>状态：</strong>${this.escape(p.status || (scope === 'todo' ? '未读' : '深读中'))}
+            &nbsp;|&nbsp; <strong>综合评分：</strong>${score}<br>
+            <strong>发表时间：</strong>${this.escape(published_at || publishedAt)}
+            &nbsp;|&nbsp; <strong>引用量：</strong>${citationCount}<br>
+            <strong>PDF：</strong>${this.escape(record.fileName || 'PDF')}
+            &nbsp;(${this.formatFileSize(record.size || 0)})
+          </p>
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+            <button class="btn btn-secondary btn-sm" onclick="${editCall}">编辑记录</button>
+            ${p.link ? `<a class="btn btn-secondary btn-sm" href="${this.escape(p.link)}" target="_blank">外部链接</a>` : ''}
+          </div>
+        </div>
+        <div class="reader-record-section">
+          <h4>作者与来源</h4>
+          <p>${this.escape(p.authors || '-')}<br>${this.escape(p.source || '-')}</p>
+          <h4 style="margin-top:10px;">元数据</h4>
+          <p>DOI：${this.escape(p.doi || '-')}<br>arXiv：${this.escape(p.arxiv_id || '-')}</p>
+        </div>
+        ${s('一句话定位', p.oneSentence)}
+        ${s('摘要', p.abstract)}
+      </div>
+    `;
+  },
+
+  async renderPdfDocument(blob, options = {}) {
+    const scroll = document.getElementById('pdf-scroll');
+    scroll.innerHTML = '<div class="reader-empty">正在加载 PDF...</div>';
+    try {
+      const data = await blob.arrayBuffer();
+      this.currentPdfDoc = await window.pdfjsLib.getDocument({ data }).promise;
+      if (options.fitWidth) {
+        const firstPage = await this.currentPdfDoc.getPage(1);
+        const baseViewport = firstPage.getViewport({ scale: 1 });
+        const available = Math.max(360, scroll.clientWidth - 56);
+        this.currentPdfScale = Math.max(0.6, Math.min(2.4, available / baseViewport.width));
+      }
+      scroll.innerHTML = '';
+      for (let pageNumber = 1; pageNumber <= this.currentPdfDoc.numPages; pageNumber += 1) {
+        await this.renderPdfPage(pageNumber, scroll);
+      }
+    } catch (error) {
+      console.error(error);
+      scroll.innerHTML = '<div class="reader-empty">PDF 加载失败。请重新导入文件后再试。</div>';
+    }
+  },
+
+  async renderPdfPage(pageNumber, scroll) {
+    const page = await this.currentPdfDoc.getPage(pageNumber);
+    const viewport = page.getViewport({ scale: this.currentPdfScale });
+    const pageEl = document.createElement('div');
+    pageEl.className = 'pdf-page';
+    pageEl.dataset.page = String(pageNumber);
+    pageEl.style.width = `${viewport.width}px`;
+    pageEl.style.height = `${viewport.height}px`;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.floor(viewport.width);
+    canvas.height = Math.floor(viewport.height);
+    canvas.style.width = `${viewport.width}px`;
+    canvas.style.height = `${viewport.height}px`;
+    pageEl.appendChild(canvas);
+
+    const layer = document.createElement('div');
+    layer.className = 'highlight-layer';
+    pageEl.appendChild(layer);
+    pageEl.addEventListener('pointerdown', event => this.startHighlight(event, pageEl));
+    scroll.appendChild(pageEl);
+
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    this.renderHighlightsForPage(pageEl, pageNumber);
+  },
+
+  renderHighlightsForPage(pageEl, pageNumber) {
+    const layer = pageEl.querySelector('.highlight-layer');
+    if (!layer) return;
+    layer.innerHTML = '';
+    const annotations = this.currentReader?.annotations || [];
+    annotations.filter(item => item.page === pageNumber).forEach(annotation => {
+      const item = document.createElement('div');
+      item.className = 'pdf-highlight';
+      item.title = '点击删除此高亮';
+      item.style.left = `${annotation.x * 100}%`;
+      item.style.top = `${annotation.y * 100}%`;
+      item.style.width = `${annotation.w * 100}%`;
+      item.style.height = `${annotation.h * 100}%`;
+      item.style.background = `${annotation.color || '#fde047'}88`;
+      item.addEventListener('pointerdown', event => event.stopPropagation());
+      item.addEventListener('click', event => this.deleteHighlight(annotation.id, event));
+      layer.appendChild(item);
+    });
+  },
+
+  startHighlight(event, pageEl) {
+    if (!this.highlightMode || event.button !== 0 || event.target.classList.contains('pdf-highlight')) return;
+    event.preventDefault();
+    const rect = pageEl.getBoundingClientRect();
+    const startX = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
+    const startY = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
+    const draft = document.createElement('div');
+    draft.className = 'pdf-highlight-draft';
+    draft.style.background = `${this.highlightColor}88`;
+    pageEl.querySelector('.highlight-layer')?.appendChild(draft);
+    this.highlightDraft = {
+      pageEl,
+      draft,
+      page: Number(pageEl.dataset.page),
+      startX,
+      startY,
+      width: rect.width,
+      height: rect.height,
+      move: null,
+      up: null
+    };
+    this.highlightDraft.move = e => this.moveHighlight(e);
+    this.highlightDraft.up = e => this.finishHighlight(e);
+    document.addEventListener('pointermove', this.highlightDraft.move);
+    document.addEventListener('pointerup', this.highlightDraft.up, { once: true });
+  },
+
+  moveHighlight(event) {
+    const draftState = this.highlightDraft;
+    if (!draftState) return;
+    const rect = draftState.pageEl.getBoundingClientRect();
+    const x = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
+    const y = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
+    const left = Math.min(draftState.startX, x);
+    const top = Math.min(draftState.startY, y);
+    const width = Math.abs(x - draftState.startX);
+    const height = Math.abs(y - draftState.startY);
+    Object.assign(draftState.draft.style, {
+      left: `${left}px`,
+      top: `${top}px`,
+      width: `${width}px`,
+      height: `${height}px`
+    });
+  },
+
+  async finishHighlight(event) {
+    const draftState = this.highlightDraft;
+    if (!draftState) return;
+    document.removeEventListener('pointermove', draftState.move);
+    const rect = draftState.pageEl.getBoundingClientRect();
+    const x = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
+    const y = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
+    const left = Math.min(draftState.startX, x);
+    const top = Math.min(draftState.startY, y);
+    const width = Math.abs(x - draftState.startX);
+    const height = Math.abs(y - draftState.startY);
+    draftState.draft.remove();
+    this.highlightDraft = null;
+    if (width < 8 || height < 8 || !this.currentReader) return;
+    this.currentReader.annotations.push({
+      id: `h-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      page: draftState.page,
+      x: left / draftState.width,
+      y: top / draftState.height,
+      w: width / draftState.width,
+      h: height / draftState.height,
+      color: this.highlightColor,
+      createdAt: new Date().toISOString()
+    });
+    this.renderHighlightsForPage(draftState.pageEl, draftState.page);
+    await this.persistReaderAnnotations();
+  },
+
+  async deleteHighlight(id, event) {
+    if (event) {
+      event.stopPropagation();
+      event.preventDefault();
+    }
+    if (!this.currentReader) return;
+    const removed = this.currentReader.annotations.find(item => item.id === id);
+    this.currentReader.annotations = this.currentReader.annotations.filter(item => item.id !== id);
+    document.querySelectorAll(`.pdf-page[data-page="${removed?.page}"]`).forEach(pageEl => {
+      this.renderHighlightsForPage(pageEl, removed.page);
+    });
+    await this.persistReaderAnnotations();
+  },
+
+  async persistReaderAnnotations() {
+    if (!this.currentReader) return;
+    const next = {
+      ...this.currentReader.record,
+      annotations: this.currentReader.annotations,
+      updatedAt: new Date().toISOString()
+    };
+    this.currentReader.record = next;
+    await this.savePdfRecord(next).catch(error => console.warn('Failed to save annotations:', error));
+  },
+
+  toggleHighlightMode() {
+    this.highlightMode = !this.highlightMode;
+    this.updateHighlightToggle();
+  },
+
+  updateHighlightToggle() {
+    const button = document.getElementById('highlight-toggle');
+    if (!button) return;
+    button.textContent = this.highlightMode ? '退出高亮' : '高亮标注';
+    button.classList.toggle('btn-primary', this.highlightMode);
+    button.classList.toggle('btn-secondary', !this.highlightMode);
+  },
+
+  setHighlightColor(color) {
+    if (!HIGHLIGHT_COLORS.includes(color)) return;
+    this.highlightColor = color;
+    document.querySelectorAll('.highlight-swatch').forEach(button => {
+      button.classList.toggle('active', button.style.backgroundColor === this.hexToRgb(color));
+    });
+  },
+
+  hexToRgb(hex) {
+    const value = hex.replace('#', '');
+    const r = parseInt(value.slice(0, 2), 16);
+    const g = parseInt(value.slice(2, 4), 16);
+    const b = parseInt(value.slice(4, 6), 16);
+    return `rgb(${r}, ${g}, ${b})`;
+  },
+
+  async fitReaderPdf() {
+    if (!this.currentReader?.record?.blob) return;
+    await this.renderPdfDocument(this.currentReader.record.blob, { fitWidth: true });
+  },
+
+  closePdfReader() {
+    document.getElementById('reader-overlay').classList.remove('open');
+    document.getElementById('pdf-scroll').innerHTML = '';
+    this.currentReader = null;
+    this.currentPdfDoc = null;
+    this.highlightDraft = null;
+    this.highlightMode = false;
+  },
+
+  startReaderResize(event) {
+    event.preventDefault();
+    const body = document.getElementById('reader-body');
+    const rect = body.getBoundingClientRect();
+    this.readerResizeState = { rect, top: event.clientY - rect.top };
+  },
+
+  resizeReader(event) {
+    if (!this.readerResizeState) return;
+    const body = document.getElementById('reader-body');
+    const rect = this.readerResizeState.rect;
+    const top = Math.max(150, Math.min(rect.height * 0.72, event.clientY - rect.top));
+    body.style.setProperty('--reader-top-height', `${top}px`);
+    this.readerResizeState.top = top;
+  },
+
+  stopReaderResize() {
+    if (!this.readerResizeState) return;
+    localStorage.setItem('embodied_reader_top_height', `${Math.round(this.readerResizeState.top)}px`);
+    this.readerResizeState = null;
+  },
+
+  formatFileSize(bytes) {
+    const size = Number(bytes) || 0;
+    if (size < 1024) return `${size} B`;
+    if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
+    return `${(size / 1024 / 1024).toFixed(1)} MB`;
   },
 
   // ===================== Rating Standard =====================
@@ -4163,6 +4894,32 @@ const app = {
     if (input) input.click();
   },
 
+  handleCardDragOver(event) {
+    const hasFile = Array.from(event.dataTransfer?.items || []).some(item => item.kind === 'file')
+      || Array.from(event.dataTransfer?.types || []).includes('Files');
+    if (!hasFile) return;
+    event.preventDefault();
+    event.currentTarget.classList.add('drag-over');
+  },
+
+  handleCardDragLeave(event) {
+    event.currentTarget.classList.remove('drag-over');
+  },
+
+  async handlePdfDrop(event, scope, id) {
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.classList.remove('drag-over');
+    const file = Array.from(event.dataTransfer?.files || []).find(candidate => (
+      candidate.type === 'application/pdf' || /\.pdf$/i.test(candidate.name)
+    ));
+    if (!file) {
+      alert('请拖入 PDF 文件。');
+      return;
+    }
+    await this.bindPdfToRecord(scope, id, file);
+  },
+
   async importPdfFile(input) {
     const file = input.files[0];
     if (!file) return;
@@ -4173,22 +4930,20 @@ const app = {
     }
 
     try {
-      const draft = await this.createPaperDraftFromPdf(file);
       const targetId = this.pendingPdfImportPaperId || '';
       const targetTodoId = this.pendingPdfImportTodoId || '';
       this.pendingPdfImportPaperId = '';
       this.pendingPdfImportTodoId = '';
       if (targetId) {
-        this.openEditor(targetId, draft);
-        this.setSaveStatus('已从 PDF 补全文献信息，请检查后保存', 'dirty');
+        await this.bindPdfToRecord('paper', targetId, file);
       } else if (targetTodoId) {
-        this.openTodoEditor(targetTodoId, draft);
-        this.setSaveStatus('已从 PDF 补全待办信息，请检查后保存', 'dirty');
+        await this.bindPdfToRecord('todo', targetTodoId, file);
       } else {
+        const draft = await this.createPaperDraftFromPdf(file);
         this.openEditor(null, draft);
         this.setSaveStatus('已从 PDF 生成草稿，请检查后保存', 'dirty');
+        this.formDirty = true;
       }
-      this.formDirty = true;
     } catch (err) {
       alert('导入 PDF 失败：' + err.message);
     } finally {
@@ -4196,6 +4951,36 @@ const app = {
       this.pendingPdfImportTodoId = '';
       input.value = '';
     }
+  },
+
+  async bindPdfToRecord(scope, id, file) {
+    if (!this.pdfDb) {
+      alert('当前浏览器不支持本地 PDF 存储，无法绑定 PDF。');
+      return;
+    }
+    const draft = await this.createPaperDraftFromPdf(file);
+    const existing = await this.getPdfRecord(scope, id).catch(() => null);
+    const record = {
+      key: this.pdfKey(scope, id),
+      scope,
+      id,
+      fileName: file.name,
+      fileType: file.type || 'application/pdf',
+      size: file.size,
+      updatedAt: new Date().toISOString(),
+      blob: file,
+      annotations: existing?.annotations || []
+    };
+    await this.savePdfRecord(record);
+    this.render();
+    if (scope === 'todo') {
+      this.openTodoEditor(id, draft);
+      this.setSaveStatus('已绑定 PDF 并补全待办信息，请检查后保存', 'dirty');
+    } else {
+      this.openEditor(id, draft);
+      this.setSaveStatus('已绑定 PDF 并补全文献信息，请检查后保存', 'dirty');
+    }
+    this.formDirty = true;
   },
 
   mergePdfDraftIntoPaper(paper, draft) {

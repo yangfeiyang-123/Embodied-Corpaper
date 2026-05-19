@@ -1823,6 +1823,11 @@
         <span class="btn-label">导入</span>
       </button>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="app.importData(this)">
+      <button class="btn btn-secondary" onclick="document.getElementById('pdf-import-file').click()">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15h6M9 18h4"/></svg>
+        <span class="btn-label">导入PDF</span>
+      </button>
+      <input type="file" id="pdf-import-file" accept=".pdf,application/pdf" style="display:none" onchange="app.importPdfFile(this)">
       <div class="user-menu" id="user-menu" onclick="app.showUserDropdown()" style="display:none;">
         <span class="user-avatar" id="user-avatar">?</span>
         <span id="user-name">未登录</span>
@@ -3239,9 +3244,9 @@ const app = {
   },
 
   // ===================== Editor =====================
-  openEditor(id) {
+  openEditor(id, draft = null) {
     const isEdit = !!id;
-    let p = isEdit ? this.papers.find(x=>x.id===id) : createEmptyPaper();
+    let p = isEdit ? this.papers.find(x=>x.id===id) : (draft ? { ...createEmptyPaper(), ...draft } : createEmptyPaper());
     if (!p) p = createEmptyPaper();
     if (isEdit) this.editingId = id;
     else this.editingId = null;
@@ -4091,6 +4096,89 @@ const app = {
       input.value = '';
     };
     reader.readAsText(file);
+  },
+
+  async importPdfFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+    if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') {
+      alert('请选择 PDF 文件。');
+      input.value = '';
+      return;
+    }
+
+    try {
+      const draft = await this.createPaperDraftFromPdf(file);
+      this.openEditor(null, draft);
+      this.setSaveStatus('已从 PDF 生成草稿，请检查后保存', 'dirty');
+      this.formDirty = true;
+    } catch (err) {
+      alert('导入 PDF 失败：' + err.message);
+    } finally {
+      input.value = '';
+    }
+  },
+
+  async createPaperDraftFromPdf(file) {
+    const fallbackTitle = file.name.replace(/\.pdf$/i, '').replace(/[_-]+/g, ' ').trim();
+    const buffer = await file.arrayBuffer();
+    const text = this.decodePdfPreview(buffer);
+    const title = this.cleanPdfText(this.findPdfInfoValue(text, 'Title')) || fallbackTitle;
+    const authors = this.cleanPdfText(this.findPdfInfoValue(text, 'Author'));
+    const doi = this.findDoi(text);
+    const arxivId = this.findArxivId(text) || this.findArxivId(file.name);
+    const canonicalUrl = doi
+      ? `https://doi.org/${doi}`
+      : (arxivId ? `https://arxiv.org/abs/${arxivId}` : '');
+
+    return {
+      title,
+      authors,
+      source: `PDF：${file.name}`,
+      link: canonicalUrl,
+      canonical_url: canonicalUrl,
+      doi,
+      arxiv_id: arxivId,
+      metadata_source: 'pdf',
+      metadata_checked_at: new Date().toISOString(),
+      status: '未读',
+      recorder: this.getMemberName(false) || this.currentUser || localStorage.getItem('embodied_member_name') || '',
+      tags: ['PDF导入']
+    };
+  },
+
+  decodePdfPreview(buffer) {
+    const limit = Math.min(buffer.byteLength, 2 * 1024 * 1024);
+    const bytes = new Uint8Array(buffer.slice(0, limit));
+    try {
+      return new TextDecoder('latin1').decode(bytes);
+    } catch {
+      return Array.from(bytes, byte => String.fromCharCode(byte)).join('');
+    }
+  },
+
+  findPdfInfoValue(text, key) {
+    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = text.match(new RegExp(`/${escapedKey}\\s*\\(([^)]{1,500})\\)`));
+    return match ? match[1] : '';
+  },
+
+  cleanPdfText(value) {
+    return String(value || '')
+      .replace(/\\([()\\])/g, '$1')
+      .replace(/\\r|\\n/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  },
+
+  findDoi(text) {
+    const match = String(text || '').match(/\b10\.\d{4,9}\/[-._;()/:A-Z0-9]+\b/i);
+    return match ? match[0].replace(/[).,;]+$/g, '') : '';
+  },
+
+  findArxivId(text) {
+    const match = String(text || '').match(/\b(?:arXiv:)?(\d{4}\.\d{4,5}(?:v\d+)?|[a-z-]+(?:\.[A-Z]{2})?\/\d{7}(?:v\d+)?)\b/i);
+    return match ? match[1] : '';
   },
 
   async backfillMetadata() {

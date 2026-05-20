@@ -1258,20 +1258,14 @@
   .reader-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     gap: 14px;
     padding: 0 16px;
     border-bottom: 1px solid rgba(219,229,239,0.88);
     background: rgba(255,255,255,0.94);
   }
   .reader-title {
-    min-width: 0;
-    font-size: 14px;
-    font-weight: 750;
-    color: #112238;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    display: none;
   }
   .reader-actions {
     display: flex;
@@ -1396,24 +1390,77 @@
     font-size: 12px;
   }
   .reader-pdf-content {
+    position: relative;
     height: 100%;
     min-height: 0;
-    display: grid;
-    grid-template-columns: 248px minmax(0, 1fr);
+    overflow: hidden;
   }
   .reader-outline-panel {
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: 12;
+    width: 252px;
     min-height: 0;
     overflow: auto;
     border-right: 1px solid rgba(203,213,225,0.9);
     background: #f8fafc;
     padding: 12px 10px;
+    transition: width 0.18s ease, padding 0.18s ease;
+  }
+  .reader-outline-panel.collapsed {
+    width: 44px;
+    padding: 10px 6px;
+    overflow: hidden;
   }
   .reader-outline-title {
-    padding: 0 8px 9px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 0 4px 9px 8px;
     font-size: 12px;
     font-weight: 800;
     color: #334155;
     letter-spacing: 0;
+  }
+  .reader-outline-panel.collapsed .reader-outline-title {
+    justify-content: center;
+    padding: 0 0 9px;
+  }
+  .reader-outline-panel.collapsed .reader-outline-label,
+  .reader-outline-panel.collapsed .reader-outline-content {
+    display: none;
+  }
+  .reader-outline-toggle,
+  .reader-outline-disclosure {
+    border: 0;
+    background: transparent;
+    color: #64748b;
+    cursor: pointer;
+    border-radius: 6px;
+  }
+  .reader-outline-toggle {
+    width: 26px;
+    height: 26px;
+    font-size: 15px;
+  }
+  .reader-outline-toggle:hover,
+  .reader-outline-disclosure:hover {
+    background: #e2e8f0;
+    color: #1d4ed8;
+  }
+  .reader-outline-disclosure {
+    width: 20px;
+    min-width: 20px;
+    height: 22px;
+    padding: 0;
+    font-size: 11px;
+  }
+  .reader-outline-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 2px;
+    margin: 1px 0;
   }
   .reader-outline-empty {
     padding: 10px 8px;
@@ -1422,12 +1469,11 @@
     line-height: 1.5;
   }
   .reader-outline-item {
-    width: 100%;
-    display: block;
+    flex: 1;
+    min-width: 0;
     border: 0;
     border-radius: 7px;
-    padding: 7px 8px;
-    margin: 1px 0;
+    padding: 6px 8px;
     background: transparent;
     color: #334155;
     font-size: 12px;
@@ -1469,9 +1515,11 @@
     border-color: #0f172a;
   }
   .pdf-scroll {
+    width: 100%;
+    height: 100%;
     min-height: 0;
     overflow: auto;
-    padding: 18px 0 32px;
+    padding: 18px max(32px, calc((100% - 920px) / 2)) 32px;
     overscroll-behavior: contain;
     cursor: grab;
   }
@@ -2364,7 +2412,7 @@
 <div class="reader-overlay" id="reader-overlay">
   <div class="reader-shell">
     <div class="reader-header">
-      <div class="reader-title" id="reader-title">PDF 阅读器</div>
+      <div class="reader-title" id="reader-title"></div>
       <div class="reader-actions">
         <button class="btn btn-secondary btn-sm" id="reader-view-toggle" onclick="app.toggleReaderView()">文献详情</button>
         <button class="btn btn-secondary btn-sm reader-exit-btn" onclick="app.closePdfReader()" title="退出阅读器">←</button>
@@ -2397,7 +2445,10 @@
         </div>
         <div class="reader-pdf-content">
           <aside class="reader-outline-panel" id="reader-outline-panel">
-            <div class="reader-outline-title">大纲</div>
+            <div class="reader-outline-title">
+              <span class="reader-outline-label">大纲</span>
+              <button class="reader-outline-toggle" onclick="app.toggleReaderOutlinePanel()" title="收起大纲">‹</button>
+            </div>
             <div class="reader-outline-empty">正在读取 PDF 大纲...</div>
           </aside>
           <div class="pdf-scroll" id="pdf-scroll"></div>
@@ -2823,6 +2874,8 @@ const app = {
   readerRedoStack: [],
   readerPanState: null,
   readerOutlineItems: [],
+  readerOutlineCollapsed: false,
+  readerOutlineExpanded: new Set(),
   pendingHighlightSelection: null,
   readerZoomTimer: null,
   readerZoomAnchor: null,
@@ -4857,12 +4910,15 @@ const app = {
       this.lastSelectionHighlightKey = '';
       this.currentPdfTextPages = [];
       this.readerOutlineItems = [];
+      this.readerOutlineCollapsed = false;
+      this.readerOutlineExpanded = new Set();
       this.pendingHighlightSelection = null;
       this.hideHighlightPopover(true);
       this.updateReaderHistoryButtons();
-      document.getElementById('reader-title').textContent = `${paper.title || '未命名文献'} · ${record.fileName || 'PDF'}`;
+      document.getElementById('reader-title').textContent = '';
       document.getElementById('reader-record').innerHTML = this.renderReaderRecord(scope, paper, record);
-      document.getElementById('reader-outline-panel').innerHTML = '<div class="reader-outline-title">大纲</div><div class="reader-outline-empty">正在读取 PDF 大纲...</div>';
+      this.setReaderOutlinePanelCollapsed(false);
+      this.renderReaderOutlineLoading();
       this.setReaderView('pdf');
       document.getElementById('reader-overlay').classList.add('open');
       document.getElementById('pdf-scroll').innerHTML = '<div class="reader-empty">正在读取 PDF 文件...</div>';
@@ -4923,39 +4979,107 @@ const app = {
     if (!panel) return;
     this.readerOutlineItems = [];
     if (!this.currentPdfDoc) {
-      panel.innerHTML = '<div class="reader-outline-title">大纲</div><div class="reader-outline-empty">尚未加载 PDF。</div>';
+      this.renderReaderOutlineShell('<div class="reader-outline-empty">尚未加载 PDF。</div>');
       return;
     }
     const outline = await this.currentPdfDoc.getOutline().catch(() => null);
     if (!Array.isArray(outline) || !outline.length) {
-      panel.innerHTML = '<div class="reader-outline-title">大纲</div><div class="reader-outline-empty">这个 PDF 没有内置大纲。</div>';
+      this.renderReaderOutlineShell('<div class="reader-outline-empty">这个 PDF 没有内置大纲。</div>');
       return;
     }
 
-    const rows = [];
-    const walk = (items, level = 0) => {
-      items.forEach(item => {
-        const index = this.readerOutlineItems.length;
-        this.readerOutlineItems.push({
-          title: item.title || `章节 ${index + 1}`,
-          dest: item.dest || null,
-          url: item.url || '',
-          level
-        });
-        rows.push(`
-          <button class="reader-outline-item" style="padding-left:${8 + level * 14}px" onclick="app.jumpToReaderOutline(${index})">
-            ${this.escape(item.title || `章节 ${index + 1}`)}
-          </button>
-        `);
-        if (Array.isArray(item.items) && item.items.length) walk(item.items, level + 1);
-      });
-    };
-    walk(outline);
-    panel.innerHTML = `<div class="reader-outline-title">大纲</div>${rows.join('')}`;
+    const build = (items, level = 0) => items.map(item => {
+      const id = `outline-${this.readerOutlineItems.length}`;
+      const node = {
+        id,
+        title: item.title || `章节 ${this.readerOutlineItems.length + 1}`,
+        dest: item.dest || null,
+        url: item.url || '',
+        level,
+        children: []
+      };
+      this.readerOutlineItems.push(node);
+      node.children = Array.isArray(item.items) && item.items.length ? build(item.items, level + 1) : [];
+      if (node.children.length) this.readerOutlineExpanded.add(id);
+      return node;
+    });
+    const tree = build(outline);
+    this.renderReaderOutlineTree(tree);
   },
 
-  async jumpToReaderOutline(index) {
-    const item = this.readerOutlineItems[index];
+  renderReaderOutlineLoading() {
+    this.renderReaderOutlineShell('<div class="reader-outline-empty">正在读取 PDF 大纲...</div>');
+  },
+
+  renderReaderOutlineShell(content = '') {
+    const panel = document.getElementById('reader-outline-panel');
+    if (!panel) return;
+    panel.classList.toggle('collapsed', this.readerOutlineCollapsed);
+    panel.innerHTML = `
+      <div class="reader-outline-title">
+        <span class="reader-outline-label">大纲</span>
+        <button class="reader-outline-toggle" onclick="app.toggleReaderOutlinePanel()" title="${this.readerOutlineCollapsed ? '展开大纲' : '收起大纲'}">
+          ${this.readerOutlineCollapsed ? '›' : '‹'}
+        </button>
+      </div>
+      <div class="reader-outline-content">${content}</div>
+    `;
+  },
+
+  renderReaderOutlineTree(tree = null) {
+    const roots = tree || this.readerOutlineItems.filter(item => item.level === 0);
+    const rows = [];
+    const renderNode = node => {
+      const hasChildren = node.children.length > 0;
+      const expanded = this.readerOutlineExpanded.has(node.id);
+      rows.push(`
+        <div class="reader-outline-row" style="padding-left:${node.level * 12}px">
+          ${hasChildren
+            ? `<button class="reader-outline-disclosure" onclick="app.toggleReaderOutlineNode('${this.escapeJs(node.id)}', event)" title="${expanded ? '收起章节' : '展开章节'}">${expanded ? '▾' : '▸'}</button>`
+            : '<span class="reader-outline-disclosure"></span>'}
+          <button class="reader-outline-item" onclick="app.jumpToReaderOutline('${this.escapeJs(node.id)}')">
+            ${this.escape(node.title)}
+          </button>
+        </div>
+      `);
+      if (hasChildren && expanded) node.children.forEach(renderNode);
+    };
+    roots.forEach(renderNode);
+    this.renderReaderOutlineShell(rows.join(''));
+  },
+
+  toggleReaderOutlinePanel() {
+    this.setReaderOutlinePanelCollapsed(!this.readerOutlineCollapsed);
+  },
+
+  setReaderOutlinePanelCollapsed(collapsed) {
+    this.readerOutlineCollapsed = Boolean(collapsed);
+    const panel = document.getElementById('reader-outline-panel');
+    if (panel) {
+      panel.classList.toggle('collapsed', this.readerOutlineCollapsed);
+      const toggle = panel.querySelector('.reader-outline-toggle');
+      if (toggle) {
+        toggle.textContent = this.readerOutlineCollapsed ? '›' : '‹';
+        toggle.title = this.readerOutlineCollapsed ? '展开大纲' : '收起大纲';
+      }
+    }
+  },
+
+  toggleReaderOutlineNode(id, event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    if (this.readerOutlineExpanded.has(id)) {
+      this.readerOutlineExpanded.delete(id);
+    } else {
+      this.readerOutlineExpanded.add(id);
+    }
+    this.renderReaderOutlineTree();
+  },
+
+  async jumpToReaderOutline(id) {
+    const item = this.readerOutlineItems.find(node => node.id === id);
     if (!item) return;
     if (item.url) {
       window.open(item.url, '_blank', 'noopener,noreferrer');
@@ -4986,7 +5110,9 @@ const app = {
     if (options.fitWidth || options.fitPage) {
       const firstPage = await this.currentPdfDoc.getPage(1);
       const baseViewport = firstPage.getViewport({ scale: 1 });
-      const availableWidth = Math.max(360, scroll.clientWidth - 56);
+      const scrollStyle = window.getComputedStyle(scroll);
+      const horizontalPadding = (parseFloat(scrollStyle.paddingLeft) || 0) + (parseFloat(scrollStyle.paddingRight) || 0);
+      const availableWidth = Math.max(360, scroll.clientWidth - horizontalPadding - 16);
       const widthScale = availableWidth / baseViewport.width;
       if (options.fitPage) {
         const availableHeight = Math.max(420, scroll.clientHeight - 36);

@@ -4537,39 +4537,48 @@ const app = {
       event.preventDefault();
       event.stopPropagation();
     }
-    if (!window.pdfjsLib) {
-      alert('PDF 阅读器加载失败，请刷新页面后重试。');
-      return;
-    }
-    const record = await this.getPdfRecord(scope, id).catch(() => null);
-    if (!record) {
-      alert('这张卡片还没有绑定 PDF。请先拖入或导入 PDF 文件。');
-      return;
-    }
-    const blob = await apiGetBlob(`/api/pdfs/${encodeURIComponent(scope)}/${encodeURIComponent(id)}/file`);
-    const paper = scope === 'todo'
-      ? this.todos.find(item => item.id === id)
-      : this.papers.find(item => item.id === id);
-    if (!paper) {
-      alert('没有找到对应的文献记录。');
-      return;
-    }
+    try {
+      if (!window.pdfjsLib) {
+        alert('PDF 阅读器加载失败，请刷新页面后重试。');
+        return;
+      }
+      const record = await this.getPdfRecord(scope, id).catch(() => null);
+      if (!record) {
+        alert('这张卡片还没有绑定 PDF。请先拖入或导入 PDF 文件。');
+        return;
+      }
+      const paper = scope === 'todo'
+        ? this.todos.find(item => item.id === id)
+        : this.papers.find(item => item.id === id);
+      if (!paper) {
+        alert('没有找到对应的文献记录。');
+        return;
+      }
 
-    this.currentReader = {
-      scope,
-      id,
-      paper,
-      record: { ...record, blob },
-      annotations: Array.isArray(record.annotations) ? [...record.annotations] : []
-    };
-    this.highlightMode = false;
-    this.updateHighlightToggle();
-    document.getElementById('reader-title').textContent = `${paper.title || '未命名文献'} · ${record.fileName || 'PDF'}`;
-    document.getElementById('reader-record').innerHTML = this.renderReaderRecord(scope, paper, record);
-    const savedTop = localStorage.getItem('embodied_reader_top_height');
-    document.getElementById('reader-body').style.setProperty('--reader-top-height', savedTop || '34%');
-    document.getElementById('reader-overlay').classList.add('open');
-    await this.renderPdfDocument(record.blob, { fitWidth: true });
+      this.currentReader = {
+        scope,
+        id,
+        paper,
+        record,
+        annotations: Array.isArray(record.annotations) ? [...record.annotations] : []
+      };
+      this.highlightMode = false;
+      this.updateHighlightToggle();
+      document.getElementById('reader-title').textContent = `${paper.title || '未命名文献'} · ${record.fileName || 'PDF'}`;
+      document.getElementById('reader-record').innerHTML = this.renderReaderRecord(scope, paper, record);
+      const savedTop = localStorage.getItem('embodied_reader_top_height');
+      document.getElementById('reader-body').style.setProperty('--reader-top-height', savedTop || '34%');
+      document.getElementById('reader-overlay').classList.add('open');
+      document.getElementById('pdf-scroll').innerHTML = '<div class="reader-empty">正在读取 PDF 文件...</div>';
+
+      const blob = await apiGetBlob(`/api/pdfs/${encodeURIComponent(scope)}/${encodeURIComponent(id)}/file`);
+      this.currentReader.record = { ...record, blob };
+      await this.renderPdfDocument(blob, { fitWidth: true });
+    } catch (error) {
+      console.error('Failed to open PDF reader:', error);
+      document.getElementById('reader-overlay').classList.add('open');
+      document.getElementById('pdf-scroll').innerHTML = `<div class="reader-empty">PDF 打开失败：${this.escape(error.message || '未知错误')}</div>`;
+    }
   },
 
   renderReaderRecord(scope, p, record) {

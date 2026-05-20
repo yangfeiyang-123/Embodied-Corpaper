@@ -1523,6 +1523,15 @@
     overscroll-behavior: contain;
     cursor: grab;
   }
+  .pdf-pages {
+    width: 100%;
+    transform-origin: top center;
+    will-change: transform;
+  }
+  .pdf-scroll.zoom-preview .pdf-pages {
+    transform: scale(var(--pdf-preview-scale, 1));
+    transition: transform 120ms cubic-bezier(.2,.8,.2,1);
+  }
   .pdf-scroll.panning {
     cursor: grabbing;
     user-select: none;
@@ -2414,7 +2423,8 @@
     <div class="reader-header">
       <div class="reader-title" id="reader-title"></div>
       <div class="reader-actions">
-        <button class="btn btn-secondary btn-sm" id="reader-view-toggle" onclick="app.toggleReaderView()">文献详情</button>
+        <button class="btn btn-secondary btn-sm" onclick="app.openReaderLinkedRecord(event)">文献详情</button>
+        <button class="btn btn-secondary btn-sm" onclick="app.downloadReaderPdf(event)">下载PDF</button>
         <button class="btn btn-secondary btn-sm reader-exit-btn" onclick="app.closePdfReader()" title="退出阅读器">←</button>
       </div>
     </div>
@@ -2868,6 +2878,7 @@ const app = {
   readerView: 'pdf',
   currentPdfDoc: null,
   currentPdfScale: 1.25,
+  renderedPdfScale: 1.25,
   currentPdfTextPages: [],
   highlightColor: '#fde047',
   readerUndoStack: [],
@@ -5123,11 +5134,17 @@ const app = {
       }
     }
     this.updateReaderScaleDisplay();
-    scroll.innerHTML = '';
     this.currentPdfTextPages = [];
+    const host = document.createElement('div');
+    host.className = 'pdf-pages';
+    host.id = 'pdf-pages';
     for (let pageNumber = 1; pageNumber <= this.currentPdfDoc.numPages; pageNumber += 1) {
-      await this.renderPdfPage(pageNumber, scroll);
+      await this.renderPdfPage(pageNumber, host);
     }
+    scroll.classList.remove('zoom-preview');
+    scroll.style.removeProperty('--pdf-preview-scale');
+    scroll.replaceChildren(host);
+    this.renderedPdfScale = this.currentPdfScale;
     if (anchor) this.restoreReaderScrollAnchor(anchor);
   },
 
@@ -5635,15 +5652,19 @@ const app = {
     if (!this.currentPdfDoc) return;
     const next = Math.max(0.45, Math.min(4, this.currentPdfScale + direction * step));
     if (Math.abs(next - this.currentPdfScale) < 0.01) return;
+    const scroll = document.getElementById('pdf-scroll');
     this.readerZoomAnchor = this.getReaderZoomAnchor(clientX, clientY);
     this.currentPdfScale = next;
     this.updateReaderScaleDisplay();
+    const previewScale = this.renderedPdfScale ? this.currentPdfScale / this.renderedPdfScale : 1;
+    scroll.style.setProperty('--pdf-preview-scale', String(previewScale));
+    scroll.classList.add('zoom-preview');
     clearTimeout(this.readerZoomTimer);
     this.readerZoomTimer = setTimeout(async () => {
       const anchor = this.readerZoomAnchor;
       this.readerZoomTimer = null;
       await this.renderCurrentPdfPages({ anchor });
-    }, 80);
+    }, 180);
   },
 
   handleReaderWheel(event) {
@@ -5668,13 +5689,17 @@ const app = {
     event.preventDefault();
     const next = Math.max(0.45, Math.min(4, this.readerGestureScaleStart * (event.scale || 1)));
     if (Math.abs(next - this.currentPdfScale) < 0.01) return;
+    const scroll = document.getElementById('pdf-scroll');
     this.currentPdfScale = next;
     this.updateReaderScaleDisplay();
+    const previewScale = this.renderedPdfScale ? this.currentPdfScale / this.renderedPdfScale : 1;
+    scroll.style.setProperty('--pdf-preview-scale', String(previewScale));
+    scroll.classList.add('zoom-preview');
     clearTimeout(this.readerZoomTimer);
     this.readerZoomTimer = setTimeout(async () => {
       this.readerZoomTimer = null;
       await this.renderCurrentPdfPages({ anchor: this.readerGestureAnchor });
-    }, 80);
+    }, 180);
   },
 
   async fitReaderPdf() {
@@ -5691,6 +5716,45 @@ const app = {
     const scroll = document.getElementById('pdf-scroll');
     if (!scroll) return;
     scroll.scrollBy({ left, top, behavior: 'smooth' });
+  },
+
+  openReaderLinkedRecord(event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    const reader = this.currentReader;
+    if (!reader) return;
+    const { scope, id } = reader;
+    this.closePdfReader();
+    if (scope === 'todo') this.openTodoEditor(id);
+    else this.openDetail(id);
+  },
+
+  downloadReaderPdf(event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    const record = this.currentReader?.record;
+    const blob = record?.blob;
+    if (!blob) {
+      alert('PDF 还没有加载完成。');
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = this.safeDownloadFileName(record.fileName || `${this.currentReader?.paper?.title || 'paper'}.pdf`);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  },
+
+  safeDownloadFileName(name) {
+    const value = String(name || 'paper.pdf').replace(/[\\/:*?"<>|]+/g, '_').trim() || 'paper.pdf';
+    return value.toLowerCase().endsWith('.pdf') ? value : `${value}.pdf`;
   },
 
   startReaderPan(event) {
@@ -5870,10 +5934,12 @@ const app = {
   closePdfReader() {
     document.getElementById('reader-overlay').classList.remove('open');
     const scroll = document.getElementById('pdf-scroll');
-    scroll.classList.remove('panning');
+    scroll.classList.remove('panning', 'zoom-preview');
+    scroll.style.removeProperty('--pdf-preview-scale');
     scroll.innerHTML = '';
     this.currentReader = null;
     this.currentPdfDoc = null;
+    this.renderedPdfScale = 1.25;
     this.currentPdfTextPages = [];
     this.readerPanState = null;
     this.readerOutlineItems = [];

@@ -2613,6 +2613,8 @@ const app = {
   pendingPdfImportPaperId: '',
   pendingPdfImportTodoId: '',
   pdfDb: null,
+  legacyPdfDb: null,
+  legacyPdfMigrationDone: false,
   pdfBindings: {},
   currentReader: null,
   currentPdfDoc: null,
@@ -2663,6 +2665,7 @@ const app = {
 
   async initPdfStore() {
     this.pdfDb = true;
+    this.legacyPdfDb = await this.openLegacyPdfDb();
   },
 
   async loadPdfIndex() {
@@ -2683,10 +2686,72 @@ const app = {
         annotationCount: Number(record.annotationCount || 0)
       };
     }
+    await this.migrateLegacyPdfStore();
   },
 
   pdfStoreRequest(mode, operation) {
     return Promise.reject(new Error('PDF storage is remote API backed'));
+  },
+
+  async openLegacyPdfDb() {
+    if (!window.indexedDB) return null;
+    return new Promise((resolve) => {
+      const request = indexedDB.open(PDF_DB_NAME, PDF_DB_VERSION);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(PDF_STORE)) {
+          db.createObjectStore(PDF_STORE, { keyPath: 'key' });
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => resolve(null);
+      request.onblocked = () => resolve(null);
+    });
+  },
+
+  legacyPdfStoreRequest(mode, operation) {
+    if (!this.legacyPdfDb) return Promise.resolve([]);
+    return new Promise((resolve, reject) => {
+      const tx = this.legacyPdfDb.transaction(PDF_STORE, mode);
+      const store = tx.objectStore(PDF_STORE);
+      const request = operation(store);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+      tx.onerror = () => reject(tx.error);
+    });
+  },
+
+  async migrateLegacyPdfStore() {
+    if (this.legacyPdfMigrationDone || !this.legacyPdfDb) return;
+    this.legacyPdfMigrationDone = true;
+    const legacyRecords = await this.legacyPdfStoreRequest('readonly', store => store.getAll()).catch(error => {
+      console.warn('Failed to read legacy PDF store:', error);
+      return [];
+    });
+    const candidates = (legacyRecords || []).filter(record => record?.blob && record.scope && record.id && !this.pdfBindings[record.key]);
+    if (!candidates.length) return;
+
+    let migrated = false;
+    for (const record of candidates) {
+      try {
+        const file = new File([record.blob], record.fileName || 'paper.pdf', { type: record.fileType || 'application/pdf' });
+        const form = new FormData();
+        form.append('file', file, file.name);
+        await apiPostForm(`/api/pdfs/${encodeURIComponent(record.scope)}/${encodeURIComponent(record.id)}`, form);
+        if (Array.isArray(record.annotations) && record.annotations.length) {
+          await apiPut(`/api/pdfs/${encodeURIComponent(record.scope)}/${encodeURIComponent(record.id)}/annotations`, {
+            annotations: record.annotations
+          });
+        }
+        migrated = true;
+      } catch (error) {
+        console.warn('Failed to migrate legacy PDF:', record.key, error);
+      }
+    }
+    if (migrated) {
+      await this.loadPdfIndex();
+      this.render();
+    }
   },
 
   async getPdfRecord(scope, id) {

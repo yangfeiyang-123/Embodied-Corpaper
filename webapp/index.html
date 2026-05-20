@@ -4600,7 +4600,7 @@ const app = {
             <strong>标签：</strong>${tags.length ? tags.map(t => '#' + this.escape(t)).join(' ') : '-'}<br>
             <strong>状态：</strong>${this.escape(p.status || (scope === 'todo' ? '未读' : '深读中'))}
             &nbsp;|&nbsp; <strong>综合评分：</strong>${score}<br>
-            <strong>发表时间：</strong>${this.escape(published_at || publishedAt)}
+            <strong>发表时间：</strong>${this.escape(p.published_at || publishedAt)}
             &nbsp;|&nbsp; <strong>引用量：</strong>${citationCount}<br>
             <strong>PDF：</strong>${this.escape(record.fileName || 'PDF')}
             &nbsp;(${this.formatFileSize(record.size || 0)})

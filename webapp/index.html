@@ -1525,7 +1525,7 @@
   }
   .pdf-pages {
     width: 100%;
-    transform-origin: top center;
+    transform-origin: var(--pdf-preview-origin, top center);
     will-change: transform;
   }
   .pdf-scroll.zoom-preview .pdf-pages {
@@ -2890,8 +2890,11 @@ const app = {
   pendingHighlightSelection: null,
   readerZoomTimer: null,
   readerZoomAnchor: null,
+  readerRenderToken: 0,
   readerGestureScaleStart: 1,
   readerGestureAnchor: null,
+  readerReturnState: null,
+  readerRestoreState: null,
   lastSelectionHighlightKey: '',
   lastSelectionHighlightAt: 0,
 
@@ -3858,8 +3861,12 @@ const app = {
     this.formDirty = false;
     document.getElementById('modal-title').textContent = '文献详情';
     document.getElementById('modal-body').innerHTML = this.renderDetailBody(p);
+    const returnButton = this.readerReturnState?.scope === 'paper' && this.readerReturnState?.id === id
+      ? '<button class="btn btn-secondary" onclick="app.returnToReaderPreview()">返回阅读</button>'
+      : '';
     document.getElementById('modal-actions').innerHTML = `
       <button class="btn btn-danger" onclick="app.deletePaper('${id}')">删除</button>
+      ${returnButton}
       <button class="btn btn-secondary" onclick="app.closeModal()">关闭</button>
       <button class="btn btn-primary" onclick="app.openEditor('${id}')">编辑</button>
     `;
@@ -4163,8 +4170,12 @@ const app = {
 
     document.getElementById('modal-title').textContent = isEdit ? '编辑待办论文' : '新增待办论文';
     document.getElementById('modal-body').innerHTML = this.renderEditorForm(p);
+    const returnButton = isEdit && this.readerReturnState?.scope === 'todo' && this.readerReturnState?.id === id
+      ? '<button class="btn btn-secondary" onclick="app.returnToReaderPreview()">返回阅读</button>'
+      : '';
     document.getElementById('modal-actions').innerHTML = `
       <span class="save-status" id="save-status">未修改</span>
+      ${returnButton}
       <button class="btn btn-secondary" onclick="app.closeModal()">取消</button>
       <button class="btn btn-secondary" id="save-button" onclick="app.saveTodo()">保存到待办</button>
       <button class="btn btn-primary" onclick="app.saveAndPublishTodo()">推送到文献库</button>
@@ -4877,6 +4888,9 @@ const app = {
     if ((this.modalMode === 'edit' || this.modalMode === 'todo-edit') && this.formDirty) {
       if (!confirm('当前表单有未保存修改，确定要关闭吗？')) return;
     }
+    if (this.readerReturnState && ['detail', 'edit', 'todo-edit'].includes(this.modalMode)) {
+      this.readerReturnState = null;
+    }
     document.getElementById('modal').classList.remove('open');
     if (this.chartInstance) { this.chartInstance.destroy(); this.chartInstance = null; }
     this.editingId = null;
@@ -4886,12 +4900,13 @@ const app = {
   },
 
   // ===================== PDF Reader =====================
-  async openPdfReader(scope, id, event) {
+  async openPdfReader(scope, id, event, options = {}) {
     if (event) {
       event.preventDefault();
       event.stopPropagation();
     }
     try {
+      const restoreState = options.restoreState || null;
       if (!window.pdfjsLib) {
         alert('PDF 阅读器加载失败，请刷新页面后重试。');
         return;
@@ -4921,14 +4936,15 @@ const app = {
       this.lastSelectionHighlightKey = '';
       this.currentPdfTextPages = [];
       this.readerOutlineItems = [];
-      this.readerOutlineCollapsed = false;
+      this.readerOutlineCollapsed = Boolean(restoreState?.outlineCollapsed);
       this.readerOutlineExpanded = new Set();
+      this.readerRestoreState = restoreState;
       this.pendingHighlightSelection = null;
       this.hideHighlightPopover(true);
       this.updateReaderHistoryButtons();
       document.getElementById('reader-title').textContent = '';
       document.getElementById('reader-record').innerHTML = this.renderReaderRecord(scope, paper, record);
-      this.setReaderOutlinePanelCollapsed(false);
+      this.setReaderOutlinePanelCollapsed(this.readerOutlineCollapsed);
       this.renderReaderOutlineLoading();
       this.setReaderView('pdf');
       document.getElementById('reader-overlay').classList.add('open');
@@ -4936,8 +4952,12 @@ const app = {
 
       const blob = await apiGetBlob(`/api/pdfs/${encodeURIComponent(scope)}/${encodeURIComponent(id)}/file`);
       this.currentReader.record = { ...record, blob };
-      await this.renderPdfDocument(blob, { fitWidth: true });
+      await this.renderPdfDocument(blob, restoreState
+        ? { scale: restoreState.scale, anchor: restoreState.anchor }
+        : { fitWidth: true });
+      this.readerRestoreState = null;
     } catch (error) {
+      this.readerRestoreState = null;
       console.error('Failed to open PDF reader:', error);
       document.getElementById('reader-overlay').classList.add('open');
       document.getElementById('pdf-scroll').innerHTML = `<div class="reader-empty">PDF 打开失败：${this.escape(error.message || '未知错误')}</div>`;
@@ -5011,10 +5031,13 @@ const app = {
       };
       this.readerOutlineItems.push(node);
       node.children = Array.isArray(item.items) && item.items.length ? build(item.items, level + 1) : [];
-      if (node.children.length) this.readerOutlineExpanded.add(id);
+      if (node.children.length && !this.readerRestoreState?.outlineExpanded) this.readerOutlineExpanded.add(id);
       return node;
     });
     const tree = build(outline);
+    if (Array.isArray(this.readerRestoreState?.outlineExpanded)) {
+      this.readerOutlineExpanded = new Set(this.readerRestoreState.outlineExpanded);
+    }
     this.renderReaderOutlineTree(tree);
   },
 
@@ -5116,10 +5139,15 @@ const app = {
 
   async renderCurrentPdfPages(options = {}) {
     if (!this.currentPdfDoc) return;
+    const token = ++this.readerRenderToken;
     const scroll = document.getElementById('pdf-scroll');
     const anchor = options.anchor || (options.preserveAnchor ? this.getReaderScrollAnchor() : null);
+    if (Number.isFinite(options.scale)) {
+      this.currentPdfScale = Math.max(0.45, Math.min(4, options.scale));
+    }
     if (options.fitWidth || options.fitPage) {
       const firstPage = await this.currentPdfDoc.getPage(1);
+      if (token !== this.readerRenderToken) return;
       const baseViewport = firstPage.getViewport({ scale: 1 });
       const scrollStyle = window.getComputedStyle(scroll);
       const horizontalPadding = (parseFloat(scrollStyle.paddingLeft) || 0) + (parseFloat(scrollStyle.paddingRight) || 0);
@@ -5134,21 +5162,29 @@ const app = {
       }
     }
     this.updateReaderScaleDisplay();
-    this.currentPdfTextPages = [];
+    const textPages = [];
     const host = document.createElement('div');
     host.className = 'pdf-pages';
     host.id = 'pdf-pages';
+    host.style.visibility = 'hidden';
     for (let pageNumber = 1; pageNumber <= this.currentPdfDoc.numPages; pageNumber += 1) {
-      await this.renderPdfPage(pageNumber, host);
+      await this.renderPdfPage(pageNumber, host, textPages);
+      if (token !== this.readerRenderToken) return;
     }
-    scroll.classList.remove('zoom-preview');
-    scroll.style.removeProperty('--pdf-preview-scale');
+    if (token !== this.readerRenderToken) return;
     scroll.replaceChildren(host);
+    this.currentPdfTextPages = textPages;
     this.renderedPdfScale = this.currentPdfScale;
     if (anchor) this.restoreReaderScrollAnchor(anchor);
+    scroll.classList.remove('zoom-preview');
+    scroll.style.removeProperty('--pdf-preview-scale');
+    scroll.style.removeProperty('--pdf-preview-origin');
+    requestAnimationFrame(() => {
+      host.style.visibility = '';
+    });
   },
 
-  async renderPdfPage(pageNumber, scroll) {
+  async renderPdfPage(pageNumber, scroll, textPages = this.currentPdfTextPages) {
     const page = await this.currentPdfDoc.getPage(pageNumber);
     const viewport = page.getViewport({ scale: this.currentPdfScale });
     const pageEl = document.createElement('div');
@@ -5180,15 +5216,15 @@ const app = {
     scroll.appendChild(pageEl);
 
     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-    await this.renderTextLayer(page, viewport, textLayer, pageNumber);
+    await this.renderTextLayer(page, viewport, textLayer, pageNumber, textPages);
     await this.renderPdfAnnotations(page, viewport, pageEl);
     this.renderHighlightsForPage(pageEl, pageNumber);
   },
 
-  async renderTextLayer(page, viewport, textLayer, pageNumber) {
+  async renderTextLayer(page, viewport, textLayer, pageNumber, textPages = this.currentPdfTextPages) {
     textLayer.style.setProperty('--scale-factor', `${viewport.scale}`);
     const textContent = await page.getTextContent();
-    this.currentPdfTextPages[pageNumber] = (textContent.items || []).map(item => item.str || '').join(' ');
+    textPages[pageNumber] = (textContent.items || []).map(item => item.str || '').join(' ');
     if (window.pdfjsLib?.renderTextLayer) {
       await window.pdfjsLib.renderTextLayer({
         textContentSource: textContent,
@@ -5602,6 +5638,9 @@ const app = {
     const viewportY = Number.isFinite(clientY) ? clientY - scrollRect.top : scroll.clientHeight / 2;
     const contentX = scroll.scrollLeft + viewportX;
     const contentY = scroll.scrollTop + viewportY;
+    const pagesHost = scroll.querySelector('.pdf-pages');
+    const originX = Math.max(0, contentX - (pagesHost?.offsetLeft || 0));
+    const originY = Math.max(0, contentY - (pagesHost?.offsetTop || 0));
     const pages = Array.from(scroll.querySelectorAll('.pdf-page'));
     const pageEl = pages.find(page => (
       contentY >= page.offsetTop
@@ -5615,7 +5654,9 @@ const app = {
       xRatio: pageEl.offsetWidth ? (contentX - pageEl.offsetLeft) / pageEl.offsetWidth : 0.5,
       yRatio: pageEl.offsetHeight ? (contentY - pageEl.offsetTop) / pageEl.offsetHeight : 0.5,
       viewportX,
-      viewportY
+      viewportY,
+      originX,
+      originY
     };
   },
 
@@ -5654,9 +5695,13 @@ const app = {
     if (Math.abs(next - this.currentPdfScale) < 0.01) return;
     const scroll = document.getElementById('pdf-scroll');
     this.readerZoomAnchor = this.getReaderZoomAnchor(clientX, clientY);
+    this.readerRenderToken += 1;
     this.currentPdfScale = next;
     this.updateReaderScaleDisplay();
     const previewScale = this.renderedPdfScale ? this.currentPdfScale / this.renderedPdfScale : 1;
+    if (this.readerZoomAnchor) {
+      scroll.style.setProperty('--pdf-preview-origin', `${this.readerZoomAnchor.originX}px ${this.readerZoomAnchor.originY}px`);
+    }
     scroll.style.setProperty('--pdf-preview-scale', String(previewScale));
     scroll.classList.add('zoom-preview');
     clearTimeout(this.readerZoomTimer);
@@ -5690,9 +5735,13 @@ const app = {
     const next = Math.max(0.45, Math.min(4, this.readerGestureScaleStart * (event.scale || 1)));
     if (Math.abs(next - this.currentPdfScale) < 0.01) return;
     const scroll = document.getElementById('pdf-scroll');
+    this.readerRenderToken += 1;
     this.currentPdfScale = next;
     this.updateReaderScaleDisplay();
     const previewScale = this.renderedPdfScale ? this.currentPdfScale / this.renderedPdfScale : 1;
+    if (this.readerGestureAnchor) {
+      scroll.style.setProperty('--pdf-preview-origin', `${this.readerGestureAnchor.originX}px ${this.readerGestureAnchor.originY}px`);
+    }
     scroll.style.setProperty('--pdf-preview-scale', String(previewScale));
     scroll.classList.add('zoom-preview');
     clearTimeout(this.readerZoomTimer);
@@ -5718,14 +5767,36 @@ const app = {
     scroll.scrollBy({ left, top, behavior: 'smooth' });
   },
 
+  captureReaderReturnState() {
+    if (!this.currentReader) return null;
+    return {
+      scope: this.currentReader.scope,
+      id: this.currentReader.id,
+      scale: this.currentPdfScale,
+      anchor: this.getReaderZoomAnchor(),
+      outlineCollapsed: this.readerOutlineCollapsed,
+      outlineExpanded: [...this.readerOutlineExpanded],
+      timestamp: Date.now()
+    };
+  },
+
+  async returnToReaderPreview() {
+    const state = this.readerReturnState;
+    if (!state) return;
+    this.readerReturnState = null;
+    this.closeModal();
+    await this.openPdfReader(state.scope, state.id, null, { restoreState: state });
+  },
+
   openReaderLinkedRecord(event) {
     if (event) {
       event.preventDefault();
       event.stopPropagation();
     }
-    const reader = this.currentReader;
-    if (!reader) return;
-    const { scope, id } = reader;
+    const state = this.captureReaderReturnState();
+    if (!state) return;
+    this.readerReturnState = state;
+    const { scope, id } = state;
     this.closePdfReader();
     if (scope === 'todo') this.openTodoEditor(id);
     else this.openDetail(id);
@@ -5932,10 +6003,12 @@ const app = {
   },
 
   closePdfReader() {
+    this.readerRenderToken += 1;
     document.getElementById('reader-overlay').classList.remove('open');
     const scroll = document.getElementById('pdf-scroll');
     scroll.classList.remove('panning', 'zoom-preview');
     scroll.style.removeProperty('--pdf-preview-scale');
+    scroll.style.removeProperty('--pdf-preview-origin');
     scroll.innerHTML = '';
     this.currentReader = null;
     this.currentPdfDoc = null;
@@ -5945,6 +6018,7 @@ const app = {
     this.readerOutlineItems = [];
     this.pendingHighlightSelection = null;
     this.readerZoomAnchor = null;
+    this.readerRestoreState = null;
     clearTimeout(this.readerZoomTimer);
     this.readerZoomTimer = null;
     this.readerUndoStack = [];

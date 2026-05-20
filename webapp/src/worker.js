@@ -17,6 +17,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, X-App-Password, X-User-Name'
 };
 
+const PDF_SCOPES = new Set(['paper', 'todo']);
+const MAX_PDF_BYTES = 60 * 1024 * 1024;
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -69,6 +72,30 @@ async function handleApi(request, env, url) {
 
     if (request.method === 'POST' && url.pathname === '/api/todos') {
       return createTodo(request, env);
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/pdfs') {
+      return listPdfRecords(request, env);
+    }
+
+    const pdfMatch = url.pathname.match(/^\/api\/pdfs\/([^/]+)\/([^/]+)(?:\/([^/]+))?$/);
+    const pdfScope = pdfMatch ? decodePathSegment(pdfMatch[1]) : '';
+    const pdfRecordId = pdfMatch ? decodePathSegment(pdfMatch[2]) : '';
+    const pdfAction = pdfMatch ? decodePathSegment(pdfMatch[3] || '') : '';
+    if (pdfMatch && request.method === 'POST' && !pdfAction) {
+      return uploadPdf(request, env, pdfScope, pdfRecordId);
+    }
+    if (pdfMatch && request.method === 'GET' && !pdfAction) {
+      return getPdfMeta(request, env, pdfScope, pdfRecordId);
+    }
+    if (pdfMatch && request.method === 'GET' && pdfAction === 'file') {
+      return getPdfFile(request, env, pdfScope, pdfRecordId);
+    }
+    if (pdfMatch && request.method === 'PUT' && pdfAction === 'annotations') {
+      return updatePdfAnnotations(request, env, pdfScope, pdfRecordId);
+    }
+    if (pdfMatch && request.method === 'DELETE' && !pdfAction) {
+      return deletePdf(request, env, pdfScope, pdfRecordId);
     }
 
     const todoPublishMatch = url.pathname.match(/^\/api\/todos\/([^/]+)\/publish$/);
@@ -136,7 +163,7 @@ async function handleApi(request, env, url) {
 
     return json({ error: 'Not found' }, 404);
   } catch (error) {
-    return json({ error: error.message || 'Internal error' }, 500);
+    return json({ error: error.message || 'Internal error' }, error.status || 500);
   }
 }
 
@@ -415,6 +442,7 @@ async function deleteTodo(request, env, id) {
   if (!username) {
     return json({ error: 'Login required' }, 401);
   }
+  await deletePdfStorage(env, 'todo', id);
   await env.DB.prepare('DELETE FROM todo_papers WHERE user_id = ? AND id = ?').bind(username, id).run();
   return json({ success: true });
 }
@@ -456,6 +484,7 @@ async function publishTodo(request, env, id) {
 
   await env.DB.batch([
     insertPaperStatement(env, paper),
+    env.DB.prepare("UPDATE paper_files SET scope = 'paper', updated_at = ? WHERE scope = 'todo' AND record_id = ?").bind(now, id),
     env.DB.prepare('DELETE FROM todo_papers WHERE user_id = ? AND id = ?').bind(username, id)
   ]);
   const saved = await env.DB.prepare('SELECT * FROM papers WHERE id = ?').bind(id).first();
@@ -667,6 +696,7 @@ async function updatePaper(request, env, id) {
 }
 
 async function deletePaper(env, id) {
+  await deletePdfStorage(env, 'paper', id);
   await env.DB.prepare('DELETE FROM comments WHERE paper_id = ?').bind(id).run();
   await env.DB.prepare('DELETE FROM favorites WHERE paper_id = ?').bind(id).run();
   await env.DB.prepare('DELETE FROM papers WHERE id = ?').bind(id).run();
@@ -803,6 +833,219 @@ async function importPapers(request, env) {
     duplicateIds,
     mode
   });
+}
+
+async function listPdfRecords(request, env) {
+  const username = request.headers.get('X-User-Name') || '';
+  const rows = username
+    ? await env.DB.prepare(
+      "SELECT * FROM paper_files WHERE scope = 'paper' OR (scope = 'todo' AND created_by = ?) ORDER BY updated_at DESC"
+    ).bind(username).all()
+    : await env.DB.prepare("SELECT * FROM paper_files WHERE scope = 'paper' ORDER BY updated_at DESC").all();
+  return json({ pdfs: (rows.results || []).map((row) => formatPdfRecord(row, false)) });
+}
+
+async function uploadPdf(request, env, scope, id) {
+  assertPdfScope(scope);
+  assertPdfStore(env);
+  await ensurePdfTarget(request, env, scope, id);
+
+  const form = await request.formData();
+  const file = form.get('file');
+  if (!file || typeof file.arrayBuffer !== 'function') {
+    return json({ error: 'PDF file is required' }, 400);
+  }
+  if (!isPdfFile(file)) {
+    return json({ error: 'Only PDF files are supported' }, 400);
+  }
+  if (file.size > MAX_PDF_BYTES) {
+    return json({ error: `PDF is too large. Limit is ${Math.round(MAX_PDF_BYTES / 1024 / 1024)} MB` }, 413);
+  }
+
+  const now = new Date().toISOString();
+  const username = request.headers.get('X-User-Name') || '';
+  const fileName = safeFileName(file.name || 'paper.pdf');
+  const old = await findPdfRecord(env, scope, id);
+  const storageKey = `${scope}/${id}/${crypto.randomUUID()}-${fileName}`;
+  await env.PDFS.put(storageKey, file.stream(), {
+    httpMetadata: {
+      contentType: 'application/pdf',
+      contentDisposition: contentDisposition(fileName)
+    },
+    customMetadata: {
+      scope,
+      record_id: id,
+      uploaded_by: username,
+      original_name: fileName
+    }
+  });
+  if (old?.storage_key) {
+    await env.PDFS.delete(old.storage_key).catch(() => {});
+  }
+
+  await env.DB.prepare(`
+    INSERT INTO paper_files (
+      scope, record_id, storage_key, file_name, content_type, size,
+      annotations_json, created_by, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, '[]', ?, ?, ?)
+    ON CONFLICT(scope, record_id) DO UPDATE SET
+      storage_key = excluded.storage_key,
+      file_name = excluded.file_name,
+      content_type = excluded.content_type,
+      size = excluded.size,
+      annotations_json = '[]',
+      updated_at = excluded.updated_at
+  `).bind(scope, id, storageKey, fileName, 'application/pdf', file.size || 0, username, old?.created_at || now, now).run();
+
+  const saved = await findPdfRecord(env, scope, id);
+  return json(formatPdfRecord(saved, true), 201);
+}
+
+async function getPdfMeta(request, env, scope, id) {
+  assertPdfScope(scope);
+  await ensurePdfTarget(request, env, scope, id, { allowMissingTarget: true });
+  const row = await findPdfRecord(env, scope, id);
+  if (!row) return json({ error: 'Not found' }, 404);
+  return json(formatPdfRecord(row, true));
+}
+
+async function getPdfFile(request, env, scope, id) {
+  assertPdfScope(scope);
+  assertPdfStore(env);
+  await ensurePdfTarget(request, env, scope, id, { allowMissingTarget: true });
+  const row = await findPdfRecord(env, scope, id);
+  if (!row) return json({ error: 'Not found' }, 404);
+  const object = await env.PDFS.get(row.storage_key);
+  if (!object) return json({ error: 'File not found' }, 404);
+  return new Response(object.body, {
+    headers: {
+      'Content-Type': row.content_type || 'application/pdf',
+      'Content-Disposition': contentDisposition(row.file_name || 'paper.pdf'),
+      'Cache-Control': 'private, max-age=60'
+    }
+  });
+}
+
+async function updatePdfAnnotations(request, env, scope, id) {
+  assertPdfScope(scope);
+  await ensurePdfTarget(request, env, scope, id, { allowMissingTarget: true });
+  const existing = await findPdfRecord(env, scope, id);
+  if (!existing) return json({ error: 'Not found' }, 404);
+  const data = await readJson(request);
+  const annotations = sanitizeAnnotations(data.annotations);
+  const now = new Date().toISOString();
+  await env.DB.prepare(
+    'UPDATE paper_files SET annotations_json = ?, updated_at = ? WHERE scope = ? AND record_id = ?'
+  ).bind(JSON.stringify(annotations), now, scope, id).run();
+  const row = await findPdfRecord(env, scope, id);
+  return json(formatPdfRecord(row, true));
+}
+
+async function deletePdf(request, env, scope, id) {
+  assertPdfScope(scope);
+  await ensurePdfTarget(request, env, scope, id, { allowMissingTarget: true });
+  await deletePdfStorage(env, scope, id);
+  return json({ success: true });
+}
+
+async function deletePdfStorage(env, scope, id) {
+  const existing = await findPdfRecord(env, scope, id).catch(() => null);
+  if (existing?.storage_key && env.PDFS) {
+    await env.PDFS.delete(existing.storage_key).catch(() => {});
+  }
+  await env.DB.prepare('DELETE FROM paper_files WHERE scope = ? AND record_id = ?').bind(scope, id).run().catch(() => {});
+}
+
+async function findPdfRecord(env, scope, id) {
+  return env.DB.prepare('SELECT * FROM paper_files WHERE scope = ? AND record_id = ?').bind(scope, id).first();
+}
+
+async function ensurePdfTarget(request, env, scope, id, options = {}) {
+  if (scope === 'paper') {
+    const row = await env.DB.prepare('SELECT id FROM papers WHERE id = ?').bind(id).first();
+    if (!row && !options.allowMissingTarget) throw httpError('Paper not found', 404);
+    return;
+  }
+  const username = request.headers.get('X-User-Name') || '';
+  if (!username) throw httpError('Login required', 401);
+  const row = await env.DB.prepare('SELECT id FROM todo_papers WHERE user_id = ? AND id = ?').bind(username, id).first();
+  if (!row && !options.allowMissingTarget) throw httpError('Todo not found', 404);
+}
+
+function assertPdfStore(env) {
+  if (!env.PDFS) {
+    throw httpError('R2 binding PDFS is not configured', 500);
+  }
+}
+
+function assertPdfScope(scope) {
+  if (!PDF_SCOPES.has(scope)) {
+    throw httpError('Invalid PDF scope', 400);
+  }
+}
+
+function httpError(message, status) {
+  return Object.assign(new Error(message), { status });
+}
+
+function formatPdfRecord(row, includeAnnotations) {
+  const annotations = parseAnnotationsJson(row?.annotations_json);
+  return {
+    key: `${row.scope}:${row.record_id}`,
+    scope: row.scope,
+    id: row.record_id,
+    fileName: row.file_name,
+    contentType: row.content_type || 'application/pdf',
+    size: Number(row.size || 0),
+    updatedAt: row.updated_at || '',
+    annotationCount: annotations.length,
+    ...(includeAnnotations ? { annotations } : {})
+  };
+}
+
+function parseAnnotationsJson(value) {
+  try {
+    const parsed = JSON.parse(value || '[]');
+    return sanitizeAnnotations(parsed);
+  } catch {
+    return [];
+  }
+}
+
+function sanitizeAnnotations(value) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 1000).map((item) => {
+    const color = /^#[0-9a-f]{6}$/i.test(String(item.color || '')) ? item.color : '#fde047';
+    return {
+      id: String(item.id || crypto.randomUUID()),
+      page: clampNumber(item.page, 1, 100000, 1),
+      x: clampNumber(item.x, 0, 1, 0),
+      y: clampNumber(item.y, 0, 1, 0),
+      w: clampNumber(item.w, 0, 1, 0),
+      h: clampNumber(item.h, 0, 1, 0),
+      color,
+      createdAt: String(item.createdAt || new Date().toISOString())
+    };
+  }).filter((item) => item.w > 0 && item.h > 0);
+}
+
+function clampNumber(value, min, max, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.max(min, Math.min(max, number));
+}
+
+function isPdfFile(file) {
+  return file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
+}
+
+function safeFileName(value) {
+  const name = String(value || 'paper.pdf').trim().replace(/[^\w.\-()\u4e00-\u9fff]+/g, '_');
+  return name.endsWith('.pdf') ? name : `${name || 'paper'}.pdf`;
+}
+
+function contentDisposition(fileName) {
+  return `inline; filename*=UTF-8''${encodeURIComponent(fileName)}`;
 }
 
 async function exportPapers(env) {

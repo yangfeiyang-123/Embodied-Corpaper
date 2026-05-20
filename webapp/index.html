@@ -1410,6 +1410,7 @@
     .reader-record-grid { grid-template-columns: 1fr; }
     .reader-toolbar { flex-wrap: wrap; height: auto; align-content: center; }
     .reader-pdf-panel { grid-template-rows: auto minmax(0, 1fr); }
+    .paper-visual { padding-right: 96px; }
   }
 
   /* ===== Confirm Dialog ===== */
@@ -1745,6 +1746,7 @@
     align-items: center;
     gap: 10px;
     margin-bottom: 14px;
+    padding-right: 122px;
   }
   .paper-mark {
     width: 42px;
@@ -1776,6 +1778,9 @@
     flex-wrap: wrap;
     min-width: 0;
     margin-bottom: 2px;
+  }
+  .paper-visual > div:last-child {
+    min-width: 0;
   }
   .paper-tag-mini {
     display: inline-flex;
@@ -2501,11 +2506,41 @@ async function apiGet(path) {
   return resp.json();
 }
 
+async function apiGetBlob(path) {
+  const resp = await fetch(API_BASE + path, { headers: apiHeaders() });
+  if (resp.status === 401) {
+    app.promptPassword();
+    throw new Error('Unauthorized');
+  }
+  if (!resp.ok) {
+    const data = await resp.json().catch(() => ({}));
+    throw new Error(data.message || data.error || 'API error ' + resp.status);
+  }
+  return resp.blob();
+}
+
 async function apiPost(path, body) {
   const resp = await fetch(API_BASE + path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...apiHeaders() },
     body: JSON.stringify(body)
+  });
+  if (resp.status === 401) {
+    app.promptPassword();
+    throw new Error('Unauthorized');
+  }
+  if (!resp.ok) {
+    const data = await resp.json().catch(() => ({}));
+    throw new Error(data.message || data.error || 'API error ' + resp.status);
+  }
+  return resp.json();
+}
+
+async function apiPostForm(path, formData) {
+  const resp = await fetch(API_BASE + path, {
+    method: 'POST',
+    headers: apiHeaders(),
+    body: formData
   });
   if (resp.status === 401) {
     app.promptPassword();
@@ -2627,32 +2662,15 @@ const app = {
   },
 
   async initPdfStore() {
-    if (!window.indexedDB) {
-      console.warn('IndexedDB is not available; PDF attachments are disabled.');
-      return;
-    }
-    this.pdfDb = await new Promise((resolve, reject) => {
-      const request = indexedDB.open(PDF_DB_NAME, PDF_DB_VERSION);
-      request.onupgradeneeded = () => {
-        const db = request.result;
-        if (!db.objectStoreNames.contains(PDF_STORE)) {
-          db.createObjectStore(PDF_STORE, { keyPath: 'key' });
-        }
-      };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    }).catch(error => {
-      console.warn('Failed to initialize PDF store:', error);
-      return null;
-    });
+    this.pdfDb = true;
   },
 
   async loadPdfIndex() {
-    if (!this.pdfDb) return;
-    const records = await this.pdfStoreRequest('readonly', store => store.getAll()).catch(error => {
+    const data = await apiGet('/api/pdfs').catch(error => {
       console.warn('Failed to load PDF index:', error);
-      return [];
+      return { pdfs: [] };
     });
+    const records = data.pdfs || [];
     this.pdfBindings = {};
     for (const record of records || []) {
       this.pdfBindings[record.key] = {
@@ -2662,51 +2680,35 @@ const app = {
         fileName: record.fileName,
         size: record.size,
         updatedAt: record.updatedAt,
-        annotationCount: Array.isArray(record.annotations) ? record.annotations.length : 0
+        annotationCount: Number(record.annotationCount || 0)
       };
     }
   },
 
   pdfStoreRequest(mode, operation) {
-    if (!this.pdfDb) return Promise.reject(new Error('PDF store unavailable'));
-    return new Promise((resolve, reject) => {
-      const tx = this.pdfDb.transaction(PDF_STORE, mode);
-      const store = tx.objectStore(PDF_STORE);
-      const request = operation(store);
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-      tx.onerror = () => reject(tx.error);
-    });
+    return Promise.reject(new Error('PDF storage is remote API backed'));
   },
 
   async getPdfRecord(scope, id) {
-    return this.pdfStoreRequest('readonly', store => store.get(this.pdfKey(scope, id)));
+    return apiGet(`/api/pdfs/${encodeURIComponent(scope)}/${encodeURIComponent(id)}`);
   },
 
   async savePdfRecord(record) {
-    await this.pdfStoreRequest('readwrite', store => store.put(record));
+    await apiPut(`/api/pdfs/${encodeURIComponent(record.scope)}/${encodeURIComponent(record.id)}/annotations`, {
+      annotations: record.annotations || []
+    });
     await this.loadPdfIndex();
   },
 
   async deletePdfRecord(scope, id) {
-    if (!this.pdfDb) return;
-    await this.pdfStoreRequest('readwrite', store => store.delete(this.pdfKey(scope, id))).catch(error => {
+    await apiDelete(`/api/pdfs/${encodeURIComponent(scope)}/${encodeURIComponent(id)}`).catch(error => {
       console.warn('Failed to delete PDF record:', error);
     });
     await this.loadPdfIndex();
   },
 
   async movePdfRecord(fromScope, toScope, id) {
-    const existing = await this.getPdfRecord(fromScope, id).catch(() => null);
-    if (!existing) return;
-    await this.savePdfRecord({
-      ...existing,
-      key: this.pdfKey(toScope, id),
-      scope: toScope,
-      id,
-      updatedAt: new Date().toISOString()
-    });
-    await this.deletePdfRecord(fromScope, id);
+    await this.loadPdfIndex();
   },
 
   getPdfBinding(scope, id) {
@@ -4475,10 +4477,11 @@ const app = {
       return;
     }
     const record = await this.getPdfRecord(scope, id).catch(() => null);
-    if (!record?.blob) {
-      alert('这张卡片还没有绑定本地 PDF。请先拖入或导入 PDF 文件。');
+    if (!record) {
+      alert('这张卡片还没有绑定 PDF。请先拖入或导入 PDF 文件。');
       return;
     }
+    const blob = await apiGetBlob(`/api/pdfs/${encodeURIComponent(scope)}/${encodeURIComponent(id)}/file`);
     const paper = scope === 'todo'
       ? this.todos.find(item => item.id === id)
       : this.papers.find(item => item.id === id);
@@ -4491,7 +4494,7 @@ const app = {
       scope,
       id,
       paper,
-      record,
+      record: { ...record, blob },
       annotations: Array.isArray(record.annotations) ? [...record.annotations] : []
     };
     this.highlightMode = false;
@@ -4955,23 +4958,14 @@ const app = {
 
   async bindPdfToRecord(scope, id, file) {
     if (!this.pdfDb) {
-      alert('当前浏览器不支持本地 PDF 存储，无法绑定 PDF。');
+      alert('PDF 存储服务暂不可用，无法绑定 PDF。');
       return;
     }
     const draft = await this.createPaperDraftFromPdf(file);
-    const existing = await this.getPdfRecord(scope, id).catch(() => null);
-    const record = {
-      key: this.pdfKey(scope, id),
-      scope,
-      id,
-      fileName: file.name,
-      fileType: file.type || 'application/pdf',
-      size: file.size,
-      updatedAt: new Date().toISOString(),
-      blob: file,
-      annotations: existing?.annotations || []
-    };
-    await this.savePdfRecord(record);
+    const form = new FormData();
+    form.append('file', file, file.name);
+    await apiPostForm(`/api/pdfs/${encodeURIComponent(scope)}/${encodeURIComponent(id)}`, form);
+    await this.loadPdfIndex();
     this.render();
     if (scope === 'todo') {
       this.openTodoEditor(id, draft);

@@ -21,6 +21,12 @@
 			"migrations_dir": "migrations"
 		}
 	],
+	"r2_buckets": [
+		{
+			"binding": "PDFS",
+			"bucket_name": "embodied-paper-pdfs"
+		}
+	],
 	"observability": {
 		"enabled": true
 	}

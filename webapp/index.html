@@ -2298,7 +2298,7 @@
     <div class="topbar">
       <div class="search-box">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-        <input type="text" id="search-input" placeholder="搜索标题、作者、方向、定位...">
+        <input type="search" id="search-input" name="paper-search-query" placeholder="搜索标题、作者、方向、定位..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" value="">
       </div>
       <select class="sort-select" id="sort-select">
         <option value="date-desc">按发表时间新→旧</option>
@@ -3146,6 +3146,7 @@ const app = {
   setupEvents() {
     // Search
     const searchInput = document.getElementById('search-input');
+    this.resetSearchAutofill(searchInput);
     let searchTimer;
     searchInput.addEventListener('input', () => {
       clearTimeout(searchTimer);
@@ -3189,6 +3190,17 @@ const app = {
     });
 
     document.addEventListener('keydown', e => this.handleGlobalKeydown(e));
+  },
+
+  resetSearchAutofill(searchInput) {
+    if (!searchInput) return;
+    searchInput.setAttribute('autocomplete', 'off');
+    searchInput.value = '';
+    setTimeout(() => {
+      if (!searchInput.value) return;
+      searchInput.value = '';
+      this.render();
+    }, 120);
   },
 
   handleGlobalKeydown(event) {

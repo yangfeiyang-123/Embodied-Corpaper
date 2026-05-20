@@ -1339,7 +1339,7 @@
     height: 100%;
     min-height: 0;
     display: grid;
-    grid-template-rows: 46px minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
     background: #e8eef6;
   }
   .reader-body.mode-record .reader-pdf-panel {
@@ -1348,10 +1348,59 @@
   .reader-toolbar {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
+    flex-wrap: wrap;
     padding: 8px 14px;
     background: #f8fafc;
     border-bottom: 1px solid rgba(203,213,225,0.9);
+  }
+  .reader-toolgroup {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding-right: 8px;
+    margin-right: 2px;
+    border-right: 1px solid rgba(203,213,225,0.9);
+  }
+  .reader-icon-btn {
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+    min-height: 32px;
+    justify-content: center;
+    padding: 0;
+    font-size: 14px;
+  }
+  .reader-scale-display {
+    min-width: 48px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 750;
+    color: #334155;
+  }
+  .reader-citation-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: min(320px, 100%);
+  }
+  .reader-citation-input {
+    width: 180px;
+    height: 32px;
+    padding: 0 10px;
+    border: 1px solid rgba(203,213,225,0.95);
+    border-radius: 8px;
+    background: #fff;
+    font-size: 12px;
+    outline: none;
+  }
+  .reader-citation-input:focus {
+    border-color: rgba(37,99,235,0.62);
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+  }
+  .reader-shortcut-hint {
+    color: #64748b;
+    font-size: 12px;
   }
   .highlight-colors {
     display: inline-flex;
@@ -1370,6 +1419,14 @@
   .pdf-scroll {
     overflow: auto;
     padding: 18px 0 32px;
+    overscroll-behavior: contain;
+  }
+  .pdf-scroll.pan-mode {
+    cursor: grab;
+  }
+  .pdf-scroll.panning {
+    cursor: grabbing;
+    user-select: none;
   }
   .pdf-page {
     position: relative;
@@ -1385,7 +1442,26 @@
     position: absolute;
     inset: 0;
     pointer-events: none;
-    z-index: 4;
+    z-index: 6;
+  }
+  .annotation-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+  }
+  .pdf-link-annotation {
+    position: absolute;
+    display: block;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    pointer-events: auto;
+  }
+  .pdf-link-annotation:hover {
+    outline: 1px solid rgba(37,99,235,0.58);
+    background: rgba(37,99,235,0.08);
   }
   .text-layer {
     position: absolute;
@@ -1423,17 +1499,37 @@
     outline: 1px dashed rgba(15,23,42,0.48);
     pointer-events: none;
   }
+  .pdf-search-pulse {
+    position: absolute;
+    z-index: 7;
+    border: 2px solid rgba(37,99,235,0.95);
+    background: rgba(37,99,235,0.14);
+    border-radius: 3px;
+    pointer-events: none;
+    animation: pdfPulse 1.15s ease-in-out 2;
+  }
+  @keyframes pdfPulse {
+    0%, 100% { opacity: 0.38; }
+    50% { opacity: 1; }
+  }
   .reader-empty {
     padding: 28px;
     text-align: center;
     color: #64748b;
+  }
+  .reader-toolbar .btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+    transform: none;
   }
   @media (max-width: 760px) {
     .reader-overlay { padding: 8px; }
     .reader-shell { border-radius: 8px; }
     .reader-header { padding: 0 10px; }
     .reader-record-grid { grid-template-columns: 1fr; }
-    .reader-toolbar { flex-wrap: wrap; height: auto; align-content: center; }
+    .reader-toolbar { height: auto; align-content: center; }
+    .reader-citation-control { flex: 1 1 100%; }
+    .reader-citation-input { flex: 1; width: auto; }
     .reader-pdf-panel { grid-template-rows: auto minmax(0, 1fr); }
     .paper-visual { padding-right: 96px; }
   }
@@ -2218,7 +2314,6 @@
       <div class="reader-title" id="reader-title">PDF 阅读器</div>
       <div class="reader-actions">
         <button class="btn btn-secondary btn-sm" id="reader-view-toggle" onclick="app.toggleReaderView()">查看文献记录</button>
-        <button class="btn btn-secondary btn-sm" id="fit-reader-button" onclick="app.fitReaderPdf()">适配宽度</button>
         <button class="btn btn-secondary btn-sm" onclick="app.closePdfReader()">关闭</button>
       </div>
     </div>
@@ -2226,6 +2321,26 @@
       <div class="reader-record" id="reader-record"></div>
       <div class="reader-pdf-panel">
         <div class="reader-toolbar">
+          <div class="reader-toolgroup" aria-label="PDF 缩放">
+            <button class="btn btn-secondary btn-sm reader-icon-btn" onclick="app.zoomReaderPdf(-1)" title="缩小（⌘/Ctrl -）">−</button>
+            <span class="reader-scale-display" id="reader-scale-display">100%</span>
+            <button class="btn btn-secondary btn-sm reader-icon-btn" onclick="app.zoomReaderPdf(1)" title="放大（⌘/Ctrl +）">+</button>
+            <button class="btn btn-secondary btn-sm" id="fit-reader-button" onclick="app.fitReaderPdf()" title="适配宽度（⌘/Ctrl 0）">宽度</button>
+            <button class="btn btn-secondary btn-sm" onclick="app.fitReaderPdfPage()" title="整页适配">整页</button>
+          </div>
+          <div class="reader-toolgroup" aria-label="PDF 浏览">
+            <button class="btn btn-secondary btn-sm reader-icon-btn" onclick="app.scrollReaderBy(-360, 0)" title="向左滑动">←</button>
+            <button class="btn btn-secondary btn-sm reader-icon-btn" onclick="app.scrollReaderBy(360, 0)" title="向右滑动">→</button>
+            <button class="btn btn-secondary btn-sm" id="pan-toggle" onclick="app.toggleReaderPanMode()" title="开启后可拖动页面浏览">拖动</button>
+          </div>
+          <div class="reader-toolgroup" aria-label="PDF 标注历史">
+            <button class="btn btn-secondary btn-sm" id="reader-undo-button" onclick="app.undoReaderAnnotation()" title="撤回标注（⌘/Ctrl Z）">撤回</button>
+            <button class="btn btn-secondary btn-sm" id="reader-redo-button" onclick="app.redoReaderAnnotation()" title="重做标注（⌘/Ctrl Shift Z / Ctrl Y）">重做</button>
+          </div>
+          <div class="reader-citation-control">
+            <input class="reader-citation-input" id="citation-jump-input" placeholder="定位引用或页码，如 [12]" onkeydown="app.handleCitationInput(event)">
+            <button class="btn btn-secondary btn-sm" onclick="app.locatePdfCitation()">定位</button>
+          </div>
           <button class="btn btn-secondary btn-sm" id="highlight-toggle" onclick="app.toggleHighlightMode()">高亮标注</button>
           <div class="highlight-colors" id="highlight-colors">
             <button class="highlight-swatch active" style="background:#fde047;" onclick="app.setHighlightColor('#fde047')" title="黄色"></button>
@@ -2233,7 +2348,7 @@
             <button class="highlight-swatch" style="background:#93c5fd;" onclick="app.setHighlightColor('#93c5fd')" title="蓝色"></button>
             <button class="highlight-swatch" style="background:#fda4af;" onclick="app.setHighlightColor('#fda4af')" title="粉色"></button>
           </div>
-          <span class="field-hint">开启后选中文字会自动高亮；空白处拖拽可做区域标注；点击已有高亮可删除。</span>
+          <span class="reader-shortcut-hint">选中文本会高亮；空白处拖拽做区域标注；点击高亮删除。</span>
         </div>
         <div class="pdf-scroll" id="pdf-scroll"></div>
       </div>
@@ -2645,10 +2760,16 @@ const app = {
   readerView: 'pdf',
   currentPdfDoc: null,
   currentPdfScale: 1.25,
+  currentPdfTextPages: [],
   highlightMode: false,
   highlightColor: '#fde047',
   highlightDraft: null,
-  readerResizeState: null,
+  readerUndoStack: [],
+  readerRedoStack: [],
+  readerPanMode: false,
+  readerPanState: null,
+  lastSelectionHighlightKey: '',
+  lastSelectionHighlightAt: 0,
 
   async init() {
     if (!this.currentUser) {
@@ -2926,18 +3047,90 @@ const app = {
       if (e.target.id === 'confirm-overlay') this.cancelDelete();
     });
 
-    // ESC to close modals
-    document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') {
-        if (document.getElementById('reader-overlay').classList.contains('open')) {
-          this.closePdfReader();
-        } else if (document.getElementById('confirm-overlay').classList.contains('open')) {
-          this.cancelDelete();
-        } else if (document.getElementById('modal').classList.contains('open')) {
-          this.closeModal();
+    const pdfScroll = document.getElementById('pdf-scroll');
+    pdfScroll.addEventListener('pointerdown', e => this.startReaderPan(e));
+
+    document.addEventListener('keydown', e => this.handleGlobalKeydown(e));
+  },
+
+  handleGlobalKeydown(event) {
+    const readerOpen = document.getElementById('reader-overlay').classList.contains('open');
+    const key = event.key;
+    const normalizedKey = key.toLowerCase();
+    const isShortcut = event.metaKey || event.ctrlKey;
+    const target = event.target;
+    const isEditable = target?.matches?.('input, textarea, select, [contenteditable="true"]');
+
+    if (readerOpen) {
+      if (key === 'Escape') {
+        event.preventDefault();
+        this.closePdfReader();
+        return;
+      }
+
+      if (isShortcut && normalizedKey === 'a' && this.readerView === 'pdf') {
+        event.preventDefault();
+        this.selectAllReaderText();
+        return;
+      }
+      if (isShortcut && normalizedKey === 'z') {
+        event.preventDefault();
+        if (event.shiftKey) this.redoReaderAnnotation();
+        else this.undoReaderAnnotation();
+        return;
+      }
+      if (isShortcut && normalizedKey === 'y') {
+        event.preventDefault();
+        this.redoReaderAnnotation();
+        return;
+      }
+      if (isShortcut && (key === '+' || key === '=')) {
+        event.preventDefault();
+        this.zoomReaderPdf(1);
+        return;
+      }
+      if (isShortcut && key === '-') {
+        event.preventDefault();
+        this.zoomReaderPdf(-1);
+        return;
+      }
+      if (isShortcut && key === '0') {
+        event.preventDefault();
+        this.fitReaderPdf();
+        return;
+      }
+
+      if (!isEditable && this.readerView === 'pdf') {
+        if (key === 'ArrowLeft') {
+          event.preventDefault();
+          this.scrollReaderBy(-96, 0);
+        } else if (key === 'ArrowRight') {
+          event.preventDefault();
+          this.scrollReaderBy(96, 0);
+        } else if (key === 'ArrowUp') {
+          event.preventDefault();
+          this.scrollReaderBy(0, -96);
+        } else if (key === 'ArrowDown') {
+          event.preventDefault();
+          this.scrollReaderBy(0, 96);
+        } else if (key === 'PageUp') {
+          event.preventDefault();
+          this.scrollReaderBy(0, -Math.max(320, document.getElementById('pdf-scroll').clientHeight * 0.86));
+        } else if (key === 'PageDown' || key === ' ') {
+          event.preventDefault();
+          this.scrollReaderBy(0, Math.max(320, document.getElementById('pdf-scroll').clientHeight * 0.86));
         }
       }
-    });
+      return;
+    }
+
+    if (key === 'Escape') {
+      if (document.getElementById('confirm-overlay').classList.contains('open')) {
+        this.cancelDelete();
+      } else if (document.getElementById('modal').classList.contains('open')) {
+        this.closeModal();
+      }
+    }
   },
 
   attachNavEvents() {
@@ -4584,7 +4777,14 @@ const app = {
         annotations: Array.isArray(record.annotations) ? [...record.annotations] : []
       };
       this.highlightMode = false;
+      this.readerPanMode = false;
+      this.readerUndoStack = [];
+      this.readerRedoStack = [];
+      this.lastSelectionHighlightKey = '';
+      this.currentPdfTextPages = [];
       this.updateHighlightToggle();
+      this.updateReaderPanToggle();
+      this.updateReaderHistoryButtons();
       document.getElementById('reader-title').textContent = `${paper.title || '未命名文献'} · ${record.fileName || 'PDF'}`;
       document.getElementById('reader-record').innerHTML = this.renderReaderRecord(scope, paper, record);
       this.setReaderView('pdf');
@@ -4648,20 +4848,38 @@ const app = {
     try {
       const data = await blob.arrayBuffer();
       this.currentPdfDoc = await window.pdfjsLib.getDocument({ data }).promise;
-      if (options.fitWidth) {
-        const firstPage = await this.currentPdfDoc.getPage(1);
-        const baseViewport = firstPage.getViewport({ scale: 1 });
-        const available = Math.max(360, scroll.clientWidth - 56);
-        this.currentPdfScale = Math.max(0.6, Math.min(2.4, available / baseViewport.width));
-      }
-      scroll.innerHTML = '';
-      for (let pageNumber = 1; pageNumber <= this.currentPdfDoc.numPages; pageNumber += 1) {
-        await this.renderPdfPage(pageNumber, scroll);
-      }
+      this.currentPdfTextPages = [];
+      await this.renderCurrentPdfPages(options);
     } catch (error) {
       console.error(error);
       scroll.innerHTML = '<div class="reader-empty">PDF 加载失败。请重新导入文件后再试。</div>';
     }
+  },
+
+  async renderCurrentPdfPages(options = {}) {
+    if (!this.currentPdfDoc) return;
+    const scroll = document.getElementById('pdf-scroll');
+    const anchor = options.preserveAnchor ? this.getReaderScrollAnchor() : null;
+    if (options.fitWidth || options.fitPage) {
+      const firstPage = await this.currentPdfDoc.getPage(1);
+      const baseViewport = firstPage.getViewport({ scale: 1 });
+      const availableWidth = Math.max(360, scroll.clientWidth - 56);
+      const widthScale = availableWidth / baseViewport.width;
+      if (options.fitPage) {
+        const availableHeight = Math.max(420, scroll.clientHeight - 36);
+        const heightScale = availableHeight / baseViewport.height;
+        this.currentPdfScale = Math.max(0.45, Math.min(4, Math.min(widthScale, heightScale)));
+      } else {
+        this.currentPdfScale = Math.max(0.5, Math.min(4, widthScale));
+      }
+    }
+    this.updateReaderScaleDisplay();
+    scroll.innerHTML = '';
+    this.currentPdfTextPages = [];
+    for (let pageNumber = 1; pageNumber <= this.currentPdfDoc.numPages; pageNumber += 1) {
+      await this.renderPdfPage(pageNumber, scroll);
+    }
+    if (anchor) this.restoreReaderScrollAnchor(anchor);
   },
 
   async renderPdfPage(pageNumber, scroll) {
@@ -4680,6 +4898,10 @@ const app = {
     canvas.style.height = `${viewport.height}px`;
     pageEl.appendChild(canvas);
 
+    const annotationLayer = document.createElement('div');
+    annotationLayer.className = 'annotation-layer';
+    pageEl.appendChild(annotationLayer);
+
     const layer = document.createElement('div');
     layer.className = 'highlight-layer';
     pageEl.appendChild(layer);
@@ -4693,13 +4915,15 @@ const app = {
     scroll.appendChild(pageEl);
 
     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-    await this.renderTextLayer(page, viewport, textLayer);
+    await this.renderTextLayer(page, viewport, textLayer, pageNumber);
+    await this.renderPdfAnnotations(page, viewport, pageEl);
     this.renderHighlightsForPage(pageEl, pageNumber);
   },
 
-  async renderTextLayer(page, viewport, textLayer) {
+  async renderTextLayer(page, viewport, textLayer, pageNumber) {
     textLayer.style.setProperty('--scale-factor', `${viewport.scale}`);
     const textContent = await page.getTextContent();
+    this.currentPdfTextPages[pageNumber] = (textContent.items || []).map(item => item.str || '').join(' ');
     if (window.pdfjsLib?.renderTextLayer) {
       await window.pdfjsLib.renderTextLayer({
         textContentSource: textContent,
@@ -4724,6 +4948,92 @@ const app = {
     }
   },
 
+  async renderPdfAnnotations(page, viewport, pageEl) {
+    const layer = pageEl.querySelector('.annotation-layer');
+    if (!layer) return;
+    layer.innerHTML = '';
+    const annotations = await page.getAnnotations({ intent: 'display' }).catch(() => []);
+    annotations
+      .filter(annotation => annotation.subtype === 'Link' && Array.isArray(annotation.rect))
+      .forEach(annotation => {
+        const rect = viewport.convertToViewportRectangle(annotation.rect);
+        const left = Math.min(rect[0], rect[2]);
+        const top = Math.min(rect[1], rect[3]);
+        const width = Math.abs(rect[2] - rect[0]);
+        const height = Math.abs(rect[3] - rect[1]);
+        if (width < 2 || height < 2) return;
+
+        const link = document.createElement(annotation.url ? 'a' : 'button');
+        link.className = 'pdf-link-annotation';
+        Object.assign(link.style, {
+          left: `${left}px`,
+          top: `${top}px`,
+          width: `${width}px`,
+          height: `${height}px`
+        });
+        link.title = annotation.url ? '打开链接' : '跳转到 PDF 内部位置';
+        if (annotation.url) {
+          link.href = annotation.url;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+        } else if (annotation.dest) {
+          link.type = 'button';
+          link.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
+            this.jumpToPdfDestination(annotation.dest);
+          });
+        } else {
+          return;
+        }
+        layer.appendChild(link);
+      });
+  },
+
+  async jumpToPdfDestination(dest) {
+    if (!this.currentPdfDoc) return;
+    const destination = typeof dest === 'string'
+      ? await this.currentPdfDoc.getDestination(dest).catch(() => null)
+      : dest;
+    if (!Array.isArray(destination) || !destination.length) return;
+    let pageIndex = 0;
+    try {
+      pageIndex = typeof destination[0] === 'object'
+        ? await this.currentPdfDoc.getPageIndex(destination[0])
+        : Math.max(0, Number(destination[0]) - 1);
+    } catch (error) {
+      console.warn('Failed to locate PDF destination:', error);
+      return;
+    }
+    const pageNumber = pageIndex + 1;
+    const pageEl = document.querySelector(`.pdf-page[data-page="${pageNumber}"]`);
+    const scroll = document.getElementById('pdf-scroll');
+    if (!pageEl || !scroll) return;
+
+    let targetTop = pageEl.offsetTop - 12;
+    let targetLeft = Math.max(0, pageEl.offsetLeft - 24);
+    const left = Number(destination[2]);
+    const top = Number(destination[3]);
+    if (Number.isFinite(left) || Number.isFinite(top)) {
+      const page = await this.currentPdfDoc.getPage(pageNumber).catch(() => null);
+      if (page) {
+        const viewport = page.getViewport({ scale: this.currentPdfScale });
+        const point = viewport.convertToViewportPoint(
+          Number.isFinite(left) ? left : 0,
+          Number.isFinite(top) ? top : page.view[3]
+        );
+        targetTop = pageEl.offsetTop + point[1] - 64;
+        targetLeft = pageEl.offsetLeft + point[0] - 64;
+      }
+    }
+    scroll.scrollTo({
+      top: Math.max(0, targetTop),
+      left: Math.max(0, targetLeft),
+      behavior: 'smooth'
+    });
+    this.pulsePdfPage(pageNumber);
+  },
+
   renderHighlightsForPage(pageEl, pageNumber) {
     const layer = pageEl.querySelector('.highlight-layer');
     if (!layer) return;
@@ -4745,8 +5055,9 @@ const app = {
   },
 
   startHighlight(event, pageEl) {
+    if (this.readerPanMode || this.readerPanState) return;
     if (!this.highlightMode || event.button !== 0 || event.target.classList.contains('pdf-highlight')) return;
-    if (event.target.closest?.('.text-layer')) return;
+    if (event.target.closest?.('.text-layer span')) return;
     event.preventDefault();
     const rect = pageEl.getBoundingClientRect();
     const startX = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
@@ -4804,8 +5115,9 @@ const app = {
     draftState.draft.remove();
     this.highlightDraft = null;
     if (width < 8 || height < 8 || !this.currentReader) return;
-    this.currentReader.annotations.push({
+    const annotation = {
       id: `h-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      type: 'area',
       page: draftState.page,
       x: left / draftState.width,
       y: top / draftState.height,
@@ -4813,23 +5125,26 @@ const app = {
       h: height / draftState.height,
       color: this.highlightColor,
       createdAt: new Date().toISOString()
-    });
-    this.renderHighlightsForPage(draftState.pageEl, draftState.page);
-    await this.persistReaderAnnotations();
+    };
+    await this.commitReaderAnnotations(
+      [...this.currentReader.annotations, annotation],
+      new Set([draftState.page])
+    );
   },
 
   async highlightSelectedText() {
     if (!this.highlightMode || !this.currentReader) return;
     const selection = window.getSelection?.();
     if (!selection || selection.isCollapsed || !selection.rangeCount) return;
+    const selectedText = selection.toString().replace(/\s+/g, ' ').trim();
+    if (!selectedText) return;
 
     const pages = Array.from(document.querySelectorAll('.pdf-page'));
-    const additions = [];
-    const touchedPages = new Set();
+    const rectsByPage = new Map();
     for (let i = 0; i < selection.rangeCount; i += 1) {
       const range = selection.getRangeAt(i);
       for (const rect of Array.from(range.getClientRects())) {
-        if (rect.width < 2 || rect.height < 2) continue;
+        if (rect.width < 1 || rect.height < 4) continue;
         const pageEl = pages.find(page => {
           const pageRect = page.getBoundingClientRect();
           return rect.bottom > pageRect.top && rect.top < pageRect.bottom && rect.right > pageRect.left && rect.left < pageRect.right;
@@ -4842,30 +5157,147 @@ const app = {
         const bottom = Math.min(rect.bottom, pageRect.bottom) - pageRect.top;
         const width = right - left;
         const height = bottom - top;
-        if (width < 2 || height < 2) continue;
-        additions.push({
-          id: `h-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        if (width < 1 || height < 4) continue;
+        const pageNumber = Number(pageEl.dataset.page);
+        if (!rectsByPage.has(pageNumber)) {
+          rectsByPage.set(pageNumber, { pageEl, pageRect, rects: [] });
+        }
+        rectsByPage.get(pageNumber).rects.push({ left, top, right, bottom, width, height });
+      }
+    }
+
+    const additions = [];
+    const touchedPages = new Set();
+    const stamp = Date.now();
+    for (const [pageNumber, pageData] of rectsByPage.entries()) {
+      const lineRects = this.mergeSelectionRects(pageData.rects);
+      for (const rect of lineRects) {
+        if (rect.width < 3 || rect.height < 4) continue;
+        const annotation = {
+          id: `h-${stamp}-${Math.random().toString(36).slice(2, 7)}`,
           type: 'text',
-          page: Number(pageEl.dataset.page),
-          x: left / pageRect.width,
-          y: top / pageRect.height,
-          w: width / pageRect.width,
-          h: height / pageRect.height,
+          page: pageNumber,
+          x: rect.left / pageData.pageRect.width,
+          y: rect.top / pageData.pageRect.height,
+          w: rect.width / pageData.pageRect.width,
+          h: rect.height / pageData.pageRect.height,
           color: this.highlightColor,
+          text: selectedText.slice(0, 400),
           createdAt: new Date().toISOString()
-        });
-        touchedPages.add(Number(pageEl.dataset.page));
+        };
+        if (!this.hasNearDuplicateHighlight(annotation, additions)) {
+          additions.push(annotation);
+          touchedPages.add(pageNumber);
+        }
       }
     }
     if (!additions.length) return;
-    this.currentReader.annotations.push(...additions);
+    const selectionKey = additions
+      .map(item => `${item.page}:${Math.round(item.x * 1000)}:${Math.round(item.y * 1000)}:${Math.round(item.w * 1000)}:${Math.round(item.h * 1000)}`)
+      .join('|');
+    if (selectionKey === this.lastSelectionHighlightKey && Date.now() - this.lastSelectionHighlightAt < 900) {
+      selection.removeAllRanges();
+      return;
+    }
+    this.lastSelectionHighlightKey = selectionKey;
+    this.lastSelectionHighlightAt = Date.now();
     selection.removeAllRanges();
-    touchedPages.forEach(pageNumber => {
+    await this.commitReaderAnnotations(
+      [...this.currentReader.annotations, ...additions],
+      touchedPages
+    );
+  },
+
+  mergeSelectionRects(rects) {
+    const sorted = rects
+      .filter(rect => Number.isFinite(rect.left) && Number.isFinite(rect.top))
+      .sort((a, b) => (a.top + a.height / 2) - (b.top + b.height / 2) || a.left - b.left);
+    const rows = [];
+    for (const rect of sorted) {
+      const centerY = rect.top + rect.height / 2;
+      const row = rows.find(item => Math.abs(item.centerY - centerY) <= Math.max(5, Math.min(item.height, rect.height) * 0.72));
+      if (row) {
+        row.rects.push(rect);
+        row.centerY = (row.centerY * (row.rects.length - 1) + centerY) / row.rects.length;
+        row.height = Math.max(row.height, rect.height);
+      } else {
+        rows.push({ centerY, height: rect.height, rects: [rect] });
+      }
+    }
+
+    const merged = [];
+    rows.forEach(row => {
+      row.rects.sort((a, b) => a.left - b.left);
+      let current = null;
+      row.rects.forEach(rect => {
+        if (!current) {
+          current = { ...rect };
+          return;
+        }
+        const gap = rect.left - current.right;
+        const maxGap = Math.max(8, row.height * 1.4);
+        if (gap <= maxGap) {
+          current.left = Math.min(current.left, rect.left);
+          current.top = Math.min(current.top, rect.top);
+          current.right = Math.max(current.right, rect.right);
+          current.bottom = Math.max(current.bottom, rect.bottom);
+          current.width = current.right - current.left;
+          current.height = current.bottom - current.top;
+        } else {
+          merged.push(current);
+          current = { ...rect };
+        }
+      });
+      if (current) merged.push(current);
+    });
+
+    return merged.map(rect => {
+      const verticalInset = Math.min(2, rect.height * 0.12);
+      return {
+        left: Math.max(0, rect.left - 1),
+        top: Math.max(0, rect.top + verticalInset),
+        right: rect.right + 1,
+        bottom: Math.max(rect.top + verticalInset + 2, rect.bottom - verticalInset),
+        width: rect.width + 2,
+        height: Math.max(2, rect.height - verticalInset * 2)
+      };
+    });
+  },
+
+  hasNearDuplicateHighlight(candidate, additions = []) {
+    const samePage = [...(this.currentReader?.annotations || []), ...additions]
+      .filter(item => item.page === candidate.page && item.type === candidate.type);
+    return samePage.some(item => (
+      Math.abs(item.x - candidate.x) < 0.003
+      && Math.abs(item.y - candidate.y) < 0.003
+      && Math.abs(item.w - candidate.w) < 0.004
+      && Math.abs(item.h - candidate.h) < 0.004
+    ));
+  },
+
+  async commitReaderAnnotations(nextAnnotations, touchedPages = null) {
+    if (!this.currentReader) return;
+    const previous = this.currentReader.annotations.map(item => ({ ...item }));
+    const next = nextAnnotations.map(item => ({ ...item }));
+    if (JSON.stringify(previous) === JSON.stringify(next)) return;
+    this.currentReader.annotations = next;
+    this.readerUndoStack.push({ before: previous, after: next });
+    if (this.readerUndoStack.length > 60) this.readerUndoStack.shift();
+    this.readerRedoStack = [];
+    this.renderReaderAnnotationPages(touchedPages);
+    this.updateReaderHistoryButtons();
+    await this.persistReaderAnnotations();
+  },
+
+  renderReaderAnnotationPages(touchedPages = null) {
+    const pages = touchedPages && touchedPages.size
+      ? [...touchedPages]
+      : Array.from(new Set((this.currentReader?.annotations || []).map(item => item.page)));
+    pages.forEach(pageNumber => {
       document.querySelectorAll(`.pdf-page[data-page="${pageNumber}"]`).forEach(pageEl => {
         this.renderHighlightsForPage(pageEl, pageNumber);
       });
     });
-    await this.persistReaderAnnotations();
   },
 
   async deleteHighlight(id, event) {
@@ -4875,11 +5307,11 @@ const app = {
     }
     if (!this.currentReader) return;
     const removed = this.currentReader.annotations.find(item => item.id === id);
-    this.currentReader.annotations = this.currentReader.annotations.filter(item => item.id !== id);
-    document.querySelectorAll(`.pdf-page[data-page="${removed?.page}"]`).forEach(pageEl => {
-      this.renderHighlightsForPage(pageEl, removed.page);
-    });
-    await this.persistReaderAnnotations();
+    if (!removed) return;
+    await this.commitReaderAnnotations(
+      this.currentReader.annotations.filter(item => item.id !== id),
+      new Set([removed.page])
+    );
   },
 
   async persistReaderAnnotations() {
@@ -4891,6 +5323,33 @@ const app = {
     };
     this.currentReader.record = next;
     await this.savePdfRecord(next).catch(error => console.warn('Failed to save annotations:', error));
+  },
+
+  async undoReaderAnnotation() {
+    if (!this.currentReader || !this.readerUndoStack.length) return;
+    const action = this.readerUndoStack.pop();
+    this.readerRedoStack.push(action);
+    this.currentReader.annotations = action.before.map(item => ({ ...item }));
+    this.renderReaderAnnotationPages(new Set([...action.before, ...action.after].map(item => item.page)));
+    this.updateReaderHistoryButtons();
+    await this.persistReaderAnnotations();
+  },
+
+  async redoReaderAnnotation() {
+    if (!this.currentReader || !this.readerRedoStack.length) return;
+    const action = this.readerRedoStack.pop();
+    this.readerUndoStack.push(action);
+    this.currentReader.annotations = action.after.map(item => ({ ...item }));
+    this.renderReaderAnnotationPages(new Set([...action.before, ...action.after].map(item => item.page)));
+    this.updateReaderHistoryButtons();
+    await this.persistReaderAnnotations();
+  },
+
+  updateReaderHistoryButtons() {
+    const undo = document.getElementById('reader-undo-button');
+    const redo = document.getElementById('reader-redo-button');
+    if (undo) undo.disabled = !this.readerUndoStack.length;
+    if (redo) redo.disabled = !this.readerRedoStack.length;
   },
 
   toggleHighlightMode() {
@@ -4922,9 +5381,232 @@ const app = {
     return `rgb(${r}, ${g}, ${b})`;
   },
 
+  updateReaderScaleDisplay() {
+    const display = document.getElementById('reader-scale-display');
+    if (display) display.textContent = `${Math.round(this.currentPdfScale * 100)}%`;
+  },
+
+  getReaderScrollAnchor() {
+    const scroll = document.getElementById('pdf-scroll');
+    if (!scroll) return null;
+    const centerY = scroll.scrollTop + scroll.clientHeight / 2;
+    const centerX = scroll.scrollLeft + scroll.clientWidth / 2;
+    const pages = Array.from(scroll.querySelectorAll('.pdf-page'));
+    const pageEl = pages.find(page => centerY >= page.offsetTop && centerY <= page.offsetTop + page.offsetHeight) || pages[0];
+    if (!pageEl) return null;
+    return {
+      page: Number(pageEl.dataset.page),
+      xRatio: pageEl.offsetWidth ? (centerX - pageEl.offsetLeft) / pageEl.offsetWidth : 0,
+      yRatio: pageEl.offsetHeight ? (centerY - pageEl.offsetTop) / pageEl.offsetHeight : 0
+    };
+  },
+
+  restoreReaderScrollAnchor(anchor) {
+    if (!anchor) return;
+    const scroll = document.getElementById('pdf-scroll');
+    const pageEl = document.querySelector(`.pdf-page[data-page="${anchor.page}"]`);
+    if (!scroll || !pageEl) return;
+    scroll.scrollTop = Math.max(0, pageEl.offsetTop + pageEl.offsetHeight * anchor.yRatio - scroll.clientHeight / 2);
+    scroll.scrollLeft = Math.max(0, pageEl.offsetLeft + pageEl.offsetWidth * anchor.xRatio - scroll.clientWidth / 2);
+  },
+
+  async zoomReaderPdf(direction) {
+    if (!this.currentPdfDoc) return;
+    const next = Math.max(0.45, Math.min(4, this.currentPdfScale + direction * 0.15));
+    if (Math.abs(next - this.currentPdfScale) < 0.01) return;
+    this.currentPdfScale = next;
+    await this.renderCurrentPdfPages({ preserveAnchor: true });
+  },
+
   async fitReaderPdf() {
-    if (!this.currentReader?.record?.blob) return;
-    await this.renderPdfDocument(this.currentReader.record.blob, { fitWidth: true });
+    if (!this.currentPdfDoc) return;
+    await this.renderCurrentPdfPages({ fitWidth: true, preserveAnchor: true });
+  },
+
+  async fitReaderPdfPage() {
+    if (!this.currentPdfDoc) return;
+    await this.renderCurrentPdfPages({ fitPage: true, preserveAnchor: true });
+  },
+
+  scrollReaderBy(left, top) {
+    const scroll = document.getElementById('pdf-scroll');
+    if (!scroll) return;
+    scroll.scrollBy({ left, top, behavior: 'smooth' });
+  },
+
+  toggleReaderPanMode() {
+    this.readerPanMode = !this.readerPanMode;
+    this.updateReaderPanToggle();
+  },
+
+  updateReaderPanToggle() {
+    const button = document.getElementById('pan-toggle');
+    const scroll = document.getElementById('pdf-scroll');
+    if (button) {
+      button.textContent = this.readerPanMode ? '退出拖动' : '拖动';
+      button.classList.toggle('btn-primary', this.readerPanMode);
+      button.classList.toggle('btn-secondary', !this.readerPanMode);
+    }
+    scroll?.classList.toggle('pan-mode', this.readerPanMode);
+  },
+
+  startReaderPan(event) {
+    const readerOpen = document.getElementById('reader-overlay').classList.contains('open');
+    if (!readerOpen || this.readerView !== 'pdf' || event.button !== 0) return;
+    if (!this.readerPanMode && event.pointerType === 'mouse') return;
+    if (this.highlightMode || event.target.closest?.('button, a, input, .pdf-highlight, .text-layer span')) return;
+    const scroll = document.getElementById('pdf-scroll');
+    event.preventDefault();
+    try {
+      scroll.setPointerCapture?.(event.pointerId);
+    } catch (_) {}
+    scroll.classList.add('panning');
+    this.readerPanState = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      left: scroll.scrollLeft,
+      top: scroll.scrollTop,
+      move: null,
+      up: null
+    };
+    this.readerPanState.move = e => this.moveReaderPan(e);
+    this.readerPanState.up = e => this.stopReaderPan(e);
+    document.addEventListener('pointermove', this.readerPanState.move);
+    document.addEventListener('pointerup', this.readerPanState.up, { once: true });
+  },
+
+  moveReaderPan(event) {
+    if (!this.readerPanState) return;
+    const scroll = document.getElementById('pdf-scroll');
+    scroll.scrollLeft = this.readerPanState.left - (event.clientX - this.readerPanState.x);
+    scroll.scrollTop = this.readerPanState.top - (event.clientY - this.readerPanState.y);
+  },
+
+  stopReaderPan(event) {
+    if (!this.readerPanState) return;
+    document.removeEventListener('pointermove', this.readerPanState.move);
+    const scroll = document.getElementById('pdf-scroll');
+    try {
+      scroll.releasePointerCapture?.(this.readerPanState.pointerId || event.pointerId);
+    } catch (_) {}
+    scroll.classList.remove('panning');
+    this.readerPanState = null;
+  },
+
+  selectAllReaderText() {
+    const textLayers = Array.from(document.querySelectorAll('.pdf-page .text-layer'));
+    if (!textLayers.length) return;
+    const first = textLayers[0];
+    const last = textLayers[textLayers.length - 1];
+    const range = document.createRange();
+    range.setStartBefore(first);
+    range.setEndAfter(last);
+    const selection = window.getSelection?.();
+    if (!selection) return;
+    selection.removeAllRanges();
+    selection.addRange(range);
+  },
+
+  handleCitationInput(event) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      this.locatePdfCitation();
+    }
+  },
+
+  normalizePdfSearchText(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  },
+
+  async locatePdfCitation() {
+    if (!this.currentPdfDoc) return;
+    const input = document.getElementById('citation-jump-input');
+    const raw = input?.value || '';
+    const query = this.normalizePdfSearchText(raw);
+    if (!query) return;
+    const number = Number.parseInt(query.replace(/[^\d]/g, ''), 10);
+    const tokens = [query];
+    if (Number.isFinite(number)) {
+      tokens.push(`[${number}]`, `(${number})`, `${number}.`);
+    }
+    const normalizedTokens = [...new Set(tokens.map(item => this.normalizePdfSearchText(item)).filter(Boolean))];
+
+    let pageNumber = 0;
+    for (let i = 1; i < this.currentPdfTextPages.length; i += 1) {
+      const pageText = this.normalizePdfSearchText(this.currentPdfTextPages[i]);
+      if (normalizedTokens.some(token => pageText.includes(token))) {
+        pageNumber = i;
+        break;
+      }
+    }
+    if (!pageNumber && Number.isFinite(number) && number >= 1 && number <= this.currentPdfDoc.numPages) {
+      pageNumber = number;
+    }
+    if (!pageNumber) {
+      alert('没有在 PDF 中找到这个引用或页码。');
+      return;
+    }
+    this.scrollToPdfPage(pageNumber);
+    this.pulsePdfCitationMatch(pageNumber, normalizedTokens);
+  },
+
+  scrollToPdfPage(pageNumber) {
+    const scroll = document.getElementById('pdf-scroll');
+    const pageEl = document.querySelector(`.pdf-page[data-page="${pageNumber}"]`);
+    if (!scroll || !pageEl) return;
+    scroll.scrollTo({
+      top: Math.max(0, pageEl.offsetTop - 12),
+      left: Math.max(0, pageEl.offsetLeft - 24),
+      behavior: 'smooth'
+    });
+  },
+
+  pulsePdfCitationMatch(pageNumber, tokens) {
+    const pageEl = document.querySelector(`.pdf-page[data-page="${pageNumber}"]`);
+    if (!pageEl) return;
+    pageEl.querySelectorAll('.pdf-search-pulse').forEach(item => item.remove());
+    const spans = Array.from(pageEl.querySelectorAll('.text-layer span'));
+    const match = spans.find(span => {
+      const text = this.normalizePdfSearchText(span.textContent);
+      return tokens.some(token => text.includes(token));
+    });
+    if (match) {
+      const pageRect = pageEl.getBoundingClientRect();
+      const rect = match.getBoundingClientRect();
+      this.addPdfPulse(pageEl, {
+        left: rect.left - pageRect.left - 2,
+        top: rect.top - pageRect.top - 2,
+        width: rect.width + 4,
+        height: rect.height + 4
+      });
+    } else {
+      this.pulsePdfPage(pageNumber);
+    }
+  },
+
+  pulsePdfPage(pageNumber) {
+    const pageEl = document.querySelector(`.pdf-page[data-page="${pageNumber}"]`);
+    if (!pageEl) return;
+    this.addPdfPulse(pageEl, {
+      left: 12,
+      top: 12,
+      width: Math.max(80, pageEl.offsetWidth - 24),
+      height: 48
+    });
+  },
+
+  addPdfPulse(pageEl, rect) {
+    const pulse = document.createElement('div');
+    pulse.className = 'pdf-search-pulse';
+    Object.assign(pulse.style, {
+      left: `${Math.max(0, rect.left)}px`,
+      top: `${Math.max(0, rect.top)}px`,
+      width: `${Math.max(8, rect.width)}px`,
+      height: `${Math.max(8, rect.height)}px`
+    });
+    pageEl.appendChild(pulse);
+    setTimeout(() => pulse.remove(), 2400);
   },
 
   toggleReaderView() {
@@ -4944,34 +5626,22 @@ const app = {
 
   closePdfReader() {
     document.getElementById('reader-overlay').classList.remove('open');
-    document.getElementById('pdf-scroll').innerHTML = '';
+    const scroll = document.getElementById('pdf-scroll');
+    scroll.classList.remove('panning', 'pan-mode');
+    scroll.innerHTML = '';
     this.currentReader = null;
     this.currentPdfDoc = null;
+    this.currentPdfTextPages = [];
     this.highlightDraft = null;
     this.highlightMode = false;
+    this.readerPanMode = false;
+    this.readerPanState = null;
+    this.readerUndoStack = [];
+    this.readerRedoStack = [];
+    this.lastSelectionHighlightKey = '';
+    this.updateReaderPanToggle();
+    this.updateReaderHistoryButtons();
     this.setReaderView('pdf');
-  },
-
-  startReaderResize(event) {
-    event.preventDefault();
-    const body = document.getElementById('reader-body');
-    const rect = body.getBoundingClientRect();
-    this.readerResizeState = { rect, top: event.clientY - rect.top };
-  },
-
-  resizeReader(event) {
-    if (!this.readerResizeState) return;
-    const body = document.getElementById('reader-body');
-    const rect = this.readerResizeState.rect;
-    const top = Math.max(150, Math.min(rect.height * 0.72, event.clientY - rect.top));
-    body.style.setProperty('--reader-top-height', `${top}px`);
-    this.readerResizeState.top = top;
-  },
-
-  stopReaderResize() {
-    if (!this.readerResizeState) return;
-    localStorage.setItem('embodied_reader_top_height', `${Math.round(this.readerResizeState.top)}px`);
-    this.readerResizeState = null;
   },
 
   formatFileSize(bytes) {

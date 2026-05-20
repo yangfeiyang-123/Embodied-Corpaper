@@ -1279,6 +1279,13 @@
     gap: 8px;
     flex-shrink: 0;
   }
+  .reader-exit-btn {
+    width: 34px;
+    min-width: 34px;
+    justify-content: center;
+    padding: 0;
+    font-size: 18px;
+  }
   .reader-body {
     min-height: 0;
     overflow: hidden;
@@ -1336,7 +1343,7 @@
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
-    padding: 8px 14px;
+    padding: 7px 14px;
     background: #f8fafc;
     border-bottom: 1px solid rgba(203,213,225,0.9);
   }
@@ -1388,6 +1395,65 @@
     color: #64748b;
     font-size: 12px;
   }
+  .reader-pdf-content {
+    height: 100%;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 248px minmax(0, 1fr);
+  }
+  .reader-outline-panel {
+    min-height: 0;
+    overflow: auto;
+    border-right: 1px solid rgba(203,213,225,0.9);
+    background: #f8fafc;
+    padding: 12px 10px;
+  }
+  .reader-outline-title {
+    padding: 0 8px 9px;
+    font-size: 12px;
+    font-weight: 800;
+    color: #334155;
+    letter-spacing: 0;
+  }
+  .reader-outline-empty {
+    padding: 10px 8px;
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .reader-outline-item {
+    width: 100%;
+    display: block;
+    border: 0;
+    border-radius: 7px;
+    padding: 7px 8px;
+    margin: 1px 0;
+    background: transparent;
+    color: #334155;
+    font-size: 12px;
+    line-height: 1.35;
+    text-align: left;
+    cursor: pointer;
+  }
+  .reader-outline-item:hover {
+    background: #eef6ff;
+    color: #1d4ed8;
+  }
+  .highlight-popover {
+    position: fixed;
+    z-index: 360;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid rgba(148,163,184,0.55);
+    border-radius: 10px;
+    background: rgba(255,255,255,0.98);
+    box-shadow: 0 14px 34px rgba(15,23,42,0.20);
+  }
+  .highlight-popover.open {
+    display: inline-flex;
+  }
   .highlight-colors {
     display: inline-flex;
     gap: 6px;
@@ -1403,11 +1469,10 @@
     border-color: #0f172a;
   }
   .pdf-scroll {
+    min-height: 0;
     overflow: auto;
     padding: 18px 0 32px;
     overscroll-behavior: contain;
-  }
-  .pdf-scroll.pan-mode {
     cursor: grab;
   }
   .pdf-scroll.panning {
@@ -1468,22 +1533,15 @@
   .text-layer ::selection {
     background: rgba(37,99,235,0.24);
   }
-  .pdf-highlight,
-  .pdf-highlight-draft {
+  .pdf-highlight {
     position: absolute;
     border-radius: 2px;
     mix-blend-mode: multiply;
     pointer-events: auto;
-  }
-  .pdf-highlight {
     cursor: pointer;
   }
   .pdf-highlight:hover {
     outline: 2px solid rgba(15,23,42,0.38);
-  }
-  .pdf-highlight-draft {
-    outline: 1px dashed rgba(15,23,42,0.48);
-    pointer-events: none;
   }
   .pdf-search-pulse {
     position: absolute;
@@ -1516,6 +1574,15 @@
     .reader-toolbar { height: auto; align-content: center; }
     .reader-citation-control { flex: 1 1 100%; }
     .reader-citation-input { flex: 1; width: auto; }
+    .reader-pdf-content {
+      grid-template-columns: 1fr;
+      grid-template-rows: 132px minmax(0, 1fr);
+    }
+    .reader-outline-panel {
+      border-right: 0;
+      border-bottom: 1px solid rgba(203,213,225,0.9);
+      padding: 8px 10px;
+    }
     .reader-pdf-panel { grid-template-rows: auto minmax(0, 1fr); }
     .paper-visual { padding-right: 96px; }
   }
@@ -2299,8 +2366,8 @@
     <div class="reader-header">
       <div class="reader-title" id="reader-title">PDF 阅读器</div>
       <div class="reader-actions">
-        <button class="btn btn-secondary btn-sm" id="reader-view-toggle" onclick="app.toggleReaderView()">查看文献记录</button>
-        <button class="btn btn-secondary btn-sm" onclick="app.closePdfReader()">关闭</button>
+        <button class="btn btn-secondary btn-sm" id="reader-view-toggle" onclick="app.toggleReaderView()">文献详情</button>
+        <button class="btn btn-secondary btn-sm reader-exit-btn" onclick="app.closePdfReader()" title="退出阅读器">←</button>
       </div>
     </div>
     <div class="reader-body mode-pdf" id="reader-body">
@@ -2317,7 +2384,6 @@
           <div class="reader-toolgroup" aria-label="PDF 浏览">
             <button class="btn btn-secondary btn-sm reader-icon-btn" onclick="app.scrollReaderBy(-360, 0)" title="向左滑动">←</button>
             <button class="btn btn-secondary btn-sm reader-icon-btn" onclick="app.scrollReaderBy(360, 0)" title="向右滑动">→</button>
-            <button class="btn btn-secondary btn-sm" id="pan-toggle" onclick="app.toggleReaderPanMode()" title="开启后可拖动页面浏览">拖动</button>
           </div>
           <div class="reader-toolgroup" aria-label="PDF 标注历史">
             <button class="btn btn-secondary btn-sm" id="reader-undo-button" onclick="app.undoReaderAnnotation()" title="撤回标注（⌘/Ctrl Z）">撤回</button>
@@ -2327,18 +2393,23 @@
             <input class="reader-citation-input" id="citation-jump-input" placeholder="定位引用或页码，如 [12]" onkeydown="app.handleCitationInput(event)">
             <button class="btn btn-secondary btn-sm" onclick="app.locatePdfCitation()">定位</button>
           </div>
-          <button class="btn btn-secondary btn-sm" id="highlight-toggle" onclick="app.toggleHighlightMode()">高亮标注</button>
-          <div class="highlight-colors" id="highlight-colors">
-            <button class="highlight-swatch active" style="background:#fde047;" onclick="app.setHighlightColor('#fde047')" title="黄色"></button>
-            <button class="highlight-swatch" style="background:#86efac;" onclick="app.setHighlightColor('#86efac')" title="绿色"></button>
-            <button class="highlight-swatch" style="background:#93c5fd;" onclick="app.setHighlightColor('#93c5fd')" title="蓝色"></button>
-            <button class="highlight-swatch" style="background:#fda4af;" onclick="app.setHighlightColor('#fda4af')" title="粉色"></button>
-          </div>
-          <span class="reader-shortcut-hint">选中文本会高亮；空白处拖拽做区域标注；点击高亮删除。</span>
+          <span class="reader-shortcut-hint">选中文本后选择颜色高亮；空白处可直接拖动浏览；点击已有高亮可删除。</span>
         </div>
-        <div class="pdf-scroll" id="pdf-scroll"></div>
+        <div class="reader-pdf-content">
+          <aside class="reader-outline-panel" id="reader-outline-panel">
+            <div class="reader-outline-title">大纲</div>
+            <div class="reader-outline-empty">正在读取 PDF 大纲...</div>
+          </aside>
+          <div class="pdf-scroll" id="pdf-scroll"></div>
+        </div>
       </div>
     </div>
+  </div>
+  <div class="highlight-popover" id="highlight-popover" onmousedown="event.preventDefault()">
+    <button class="highlight-swatch" style="background:#fde047;" onclick="app.applyPendingHighlight('#fde047')" title="黄色"></button>
+    <button class="highlight-swatch" style="background:#86efac;" onclick="app.applyPendingHighlight('#86efac')" title="绿色"></button>
+    <button class="highlight-swatch" style="background:#93c5fd;" onclick="app.applyPendingHighlight('#93c5fd')" title="蓝色"></button>
+    <button class="highlight-swatch" style="background:#fda4af;" onclick="app.applyPendingHighlight('#fda4af')" title="粉色"></button>
   </div>
 </div>
 
@@ -2747,13 +2818,16 @@ const app = {
   currentPdfDoc: null,
   currentPdfScale: 1.25,
   currentPdfTextPages: [],
-  highlightMode: false,
   highlightColor: '#fde047',
-  highlightDraft: null,
   readerUndoStack: [],
   readerRedoStack: [],
-  readerPanMode: false,
   readerPanState: null,
+  readerOutlineItems: [],
+  pendingHighlightSelection: null,
+  readerZoomTimer: null,
+  readerZoomAnchor: null,
+  readerGestureScaleStart: 1,
+  readerGestureAnchor: null,
   lastSelectionHighlightKey: '',
   lastSelectionHighlightAt: 0,
 
@@ -3035,6 +3109,17 @@ const app = {
 
     const pdfScroll = document.getElementById('pdf-scroll');
     pdfScroll.addEventListener('pointerdown', e => this.startReaderPan(e));
+    pdfScroll.addEventListener('wheel', e => this.handleReaderWheel(e), { passive: false });
+    pdfScroll.addEventListener('scroll', () => this.hideHighlightPopover(false));
+    pdfScroll.addEventListener('gesturestart', e => this.startReaderGestureZoom(e), { passive: false });
+    pdfScroll.addEventListener('gesturechange', e => this.changeReaderGestureZoom(e), { passive: false });
+
+    document.addEventListener('pointerdown', e => {
+      const readerOpen = document.getElementById('reader-overlay').classList.contains('open');
+      if (!readerOpen) return;
+      if (e.target.closest?.('#highlight-popover, .text-layer span')) return;
+      this.hideHighlightPopover(true);
+    });
 
     document.addEventListener('keydown', e => this.handleGlobalKeydown(e));
   },
@@ -3050,6 +3135,10 @@ const app = {
     if (readerOpen) {
       if (key === 'Escape') {
         event.preventDefault();
+        if (document.getElementById('highlight-popover')?.classList.contains('open')) {
+          this.hideHighlightPopover(true);
+          return;
+        }
         this.closePdfReader();
         return;
       }
@@ -3057,6 +3146,7 @@ const app = {
       if (isShortcut && normalizedKey === 'a' && this.readerView === 'pdf') {
         event.preventDefault();
         this.selectAllReaderText();
+        setTimeout(() => this.prepareHighlightFromSelection(), 0);
         return;
       }
       if (isShortcut && normalizedKey === 'z') {
@@ -4762,17 +4852,17 @@ const app = {
         record,
         annotations: Array.isArray(record.annotations) ? [...record.annotations] : []
       };
-      this.highlightMode = false;
-      this.readerPanMode = false;
       this.readerUndoStack = [];
       this.readerRedoStack = [];
       this.lastSelectionHighlightKey = '';
       this.currentPdfTextPages = [];
-      this.updateHighlightToggle();
-      this.updateReaderPanToggle();
+      this.readerOutlineItems = [];
+      this.pendingHighlightSelection = null;
+      this.hideHighlightPopover(true);
       this.updateReaderHistoryButtons();
       document.getElementById('reader-title').textContent = `${paper.title || '未命名文献'} · ${record.fileName || 'PDF'}`;
       document.getElementById('reader-record').innerHTML = this.renderReaderRecord(scope, paper, record);
+      document.getElementById('reader-outline-panel').innerHTML = '<div class="reader-outline-title">大纲</div><div class="reader-outline-empty">正在读取 PDF 大纲...</div>';
       this.setReaderView('pdf');
       document.getElementById('reader-overlay').classList.add('open');
       document.getElementById('pdf-scroll').innerHTML = '<div class="reader-empty">正在读取 PDF 文件...</div>';
@@ -4828,6 +4918,52 @@ const app = {
     `;
   },
 
+  async renderReaderOutline() {
+    const panel = document.getElementById('reader-outline-panel');
+    if (!panel) return;
+    this.readerOutlineItems = [];
+    if (!this.currentPdfDoc) {
+      panel.innerHTML = '<div class="reader-outline-title">大纲</div><div class="reader-outline-empty">尚未加载 PDF。</div>';
+      return;
+    }
+    const outline = await this.currentPdfDoc.getOutline().catch(() => null);
+    if (!Array.isArray(outline) || !outline.length) {
+      panel.innerHTML = '<div class="reader-outline-title">大纲</div><div class="reader-outline-empty">这个 PDF 没有内置大纲。</div>';
+      return;
+    }
+
+    const rows = [];
+    const walk = (items, level = 0) => {
+      items.forEach(item => {
+        const index = this.readerOutlineItems.length;
+        this.readerOutlineItems.push({
+          title: item.title || `章节 ${index + 1}`,
+          dest: item.dest || null,
+          url: item.url || '',
+          level
+        });
+        rows.push(`
+          <button class="reader-outline-item" style="padding-left:${8 + level * 14}px" onclick="app.jumpToReaderOutline(${index})">
+            ${this.escape(item.title || `章节 ${index + 1}`)}
+          </button>
+        `);
+        if (Array.isArray(item.items) && item.items.length) walk(item.items, level + 1);
+      });
+    };
+    walk(outline);
+    panel.innerHTML = `<div class="reader-outline-title">大纲</div>${rows.join('')}`;
+  },
+
+  async jumpToReaderOutline(index) {
+    const item = this.readerOutlineItems[index];
+    if (!item) return;
+    if (item.url) {
+      window.open(item.url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    if (item.dest) await this.jumpToPdfDestination(item.dest);
+  },
+
   async renderPdfDocument(blob, options = {}) {
     const scroll = document.getElementById('pdf-scroll');
     scroll.innerHTML = '<div class="reader-empty">正在加载 PDF...</div>';
@@ -4835,6 +4971,7 @@ const app = {
       const data = await blob.arrayBuffer();
       this.currentPdfDoc = await window.pdfjsLib.getDocument({ data }).promise;
       this.currentPdfTextPages = [];
+      await this.renderReaderOutline();
       await this.renderCurrentPdfPages(options);
     } catch (error) {
       console.error(error);
@@ -4845,7 +4982,7 @@ const app = {
   async renderCurrentPdfPages(options = {}) {
     if (!this.currentPdfDoc) return;
     const scroll = document.getElementById('pdf-scroll');
-    const anchor = options.preserveAnchor ? this.getReaderScrollAnchor() : null;
+    const anchor = options.anchor || (options.preserveAnchor ? this.getReaderScrollAnchor() : null);
     if (options.fitWidth || options.fitPage) {
       const firstPage = await this.currentPdfDoc.getPage(1);
       const baseViewport = firstPage.getViewport({ scale: 1 });
@@ -4891,13 +5028,12 @@ const app = {
     const layer = document.createElement('div');
     layer.className = 'highlight-layer';
     pageEl.appendChild(layer);
-    pageEl.addEventListener('pointerdown', event => this.startHighlight(event, pageEl));
 
     const textLayer = document.createElement('div');
     textLayer.className = 'text-layer';
     pageEl.appendChild(textLayer);
-    textLayer.addEventListener('mouseup', () => setTimeout(() => this.highlightSelectedText(), 0));
-    textLayer.addEventListener('touchend', () => setTimeout(() => this.highlightSelectedText(), 0));
+    textLayer.addEventListener('mouseup', () => setTimeout(() => this.prepareHighlightFromSelection(), 0));
+    textLayer.addEventListener('touchend', () => setTimeout(() => this.prepareHighlightFromSelection(), 0));
     scroll.appendChild(pageEl);
 
     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
@@ -5040,93 +5176,26 @@ const app = {
     });
   },
 
-  startHighlight(event, pageEl) {
-    if (this.readerPanMode || this.readerPanState) return;
-    if (!this.highlightMode || event.button !== 0 || event.target.classList.contains('pdf-highlight')) return;
-    if (event.target.closest?.('.text-layer span')) return;
-    event.preventDefault();
-    const rect = pageEl.getBoundingClientRect();
-    const startX = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
-    const startY = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
-    const draft = document.createElement('div');
-    draft.className = 'pdf-highlight-draft';
-    draft.style.background = `${this.highlightColor}88`;
-    pageEl.querySelector('.highlight-layer')?.appendChild(draft);
-    this.highlightDraft = {
-      pageEl,
-      draft,
-      page: Number(pageEl.dataset.page),
-      startX,
-      startY,
-      width: rect.width,
-      height: rect.height,
-      move: null,
-      up: null
-    };
-    this.highlightDraft.move = e => this.moveHighlight(e);
-    this.highlightDraft.up = e => this.finishHighlight(e);
-    document.addEventListener('pointermove', this.highlightDraft.move);
-    document.addEventListener('pointerup', this.highlightDraft.up, { once: true });
+  prepareHighlightFromSelection() {
+    if (!this.currentReader) return;
+    const built = this.buildSelectionHighlights('#fde047');
+    if (!built) {
+      this.hideHighlightPopover(false);
+      return;
+    }
+    this.pendingHighlightSelection = built;
+    this.positionHighlightPopover(built.anchorRect);
   },
 
-  moveHighlight(event) {
-    const draftState = this.highlightDraft;
-    if (!draftState) return;
-    const rect = draftState.pageEl.getBoundingClientRect();
-    const x = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
-    const y = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
-    const left = Math.min(draftState.startX, x);
-    const top = Math.min(draftState.startY, y);
-    const width = Math.abs(x - draftState.startX);
-    const height = Math.abs(y - draftState.startY);
-    Object.assign(draftState.draft.style, {
-      left: `${left}px`,
-      top: `${top}px`,
-      width: `${width}px`,
-      height: `${height}px`
-    });
-  },
-
-  async finishHighlight(event) {
-    const draftState = this.highlightDraft;
-    if (!draftState) return;
-    document.removeEventListener('pointermove', draftState.move);
-    const rect = draftState.pageEl.getBoundingClientRect();
-    const x = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
-    const y = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
-    const left = Math.min(draftState.startX, x);
-    const top = Math.min(draftState.startY, y);
-    const width = Math.abs(x - draftState.startX);
-    const height = Math.abs(y - draftState.startY);
-    draftState.draft.remove();
-    this.highlightDraft = null;
-    if (width < 8 || height < 8 || !this.currentReader) return;
-    const annotation = {
-      id: `h-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      type: 'area',
-      page: draftState.page,
-      x: left / draftState.width,
-      y: top / draftState.height,
-      w: width / draftState.width,
-      h: height / draftState.height,
-      color: this.highlightColor,
-      createdAt: new Date().toISOString()
-    };
-    await this.commitReaderAnnotations(
-      [...this.currentReader.annotations, annotation],
-      new Set([draftState.page])
-    );
-  },
-
-  async highlightSelectedText() {
-    if (!this.highlightMode || !this.currentReader) return;
+  buildSelectionHighlights(color) {
     const selection = window.getSelection?.();
-    if (!selection || selection.isCollapsed || !selection.rangeCount) return;
+    if (!selection || selection.isCollapsed || !selection.rangeCount) return null;
     const selectedText = selection.toString().replace(/\s+/g, ' ').trim();
-    if (!selectedText) return;
+    if (!selectedText) return null;
 
     const pages = Array.from(document.querySelectorAll('.pdf-page'));
     const rectsByPage = new Map();
+    let anchorRect = null;
     for (let i = 0; i < selection.rangeCount; i += 1) {
       const range = selection.getRangeAt(i);
       for (const rect of Array.from(range.getClientRects())) {
@@ -5144,6 +5213,7 @@ const app = {
         const width = right - left;
         const height = bottom - top;
         if (width < 1 || height < 4) continue;
+        if (!anchorRect || rect.bottom > anchorRect.bottom) anchorRect = rect;
         const pageNumber = Number(pageEl.dataset.page);
         if (!rectsByPage.has(pageNumber)) {
           rectsByPage.set(pageNumber, { pageEl, pageRect, rects: [] });
@@ -5167,7 +5237,7 @@ const app = {
           y: rect.top / pageData.pageRect.height,
           w: rect.width / pageData.pageRect.width,
           h: rect.height / pageData.pageRect.height,
-          color: this.highlightColor,
+          color,
           text: selectedText.slice(0, 400),
           createdAt: new Date().toISOString()
         };
@@ -5177,20 +5247,54 @@ const app = {
         }
       }
     }
-    if (!additions.length) return;
+    if (!additions.length || !anchorRect) return null;
     const selectionKey = additions
       .map(item => `${item.page}:${Math.round(item.x * 1000)}:${Math.round(item.y * 1000)}:${Math.round(item.w * 1000)}:${Math.round(item.h * 1000)}`)
       .join('|');
     if (selectionKey === this.lastSelectionHighlightKey && Date.now() - this.lastSelectionHighlightAt < 900) {
-      selection.removeAllRanges();
+      return null;
+    }
+    return { additions, touchedPages, selectionKey, anchorRect };
+  },
+
+  positionHighlightPopover(anchorRect) {
+    const popover = document.getElementById('highlight-popover');
+    if (!popover || !anchorRect) return;
+    popover.classList.add('open');
+    const popoverRect = popover.getBoundingClientRect();
+    const left = Math.max(12, Math.min(window.innerWidth - popoverRect.width - 12, anchorRect.left + anchorRect.width / 2 - popoverRect.width / 2));
+    const top = Math.max(12, Math.min(window.innerHeight - popoverRect.height - 12, anchorRect.bottom + 8));
+    popover.style.left = `${left}px`;
+    popover.style.top = `${top}px`;
+  },
+
+  hideHighlightPopover(clearSelection = false) {
+    const popover = document.getElementById('highlight-popover');
+    popover?.classList.remove('open');
+    this.pendingHighlightSelection = null;
+    if (clearSelection) window.getSelection?.().removeAllRanges();
+  },
+
+  async applyPendingHighlight(color) {
+    if (!HIGHLIGHT_COLORS.includes(color) || !this.currentReader) return;
+    let pending = this.pendingHighlightSelection;
+    if (!pending) pending = this.buildSelectionHighlights(color);
+    if (!pending) return;
+    const additions = pending.additions.map(item => ({ ...item, color }));
+    const nextKey = additions
+      .map(item => `${item.page}:${Math.round(item.x * 1000)}:${Math.round(item.y * 1000)}:${Math.round(item.w * 1000)}:${Math.round(item.h * 1000)}`)
+      .join('|');
+    if (nextKey === this.lastSelectionHighlightKey && Date.now() - this.lastSelectionHighlightAt < 900) {
+      this.hideHighlightPopover(true);
       return;
     }
-    this.lastSelectionHighlightKey = selectionKey;
+    this.highlightColor = color;
+    this.lastSelectionHighlightKey = nextKey;
     this.lastSelectionHighlightAt = Date.now();
-    selection.removeAllRanges();
+    this.hideHighlightPopover(true);
     await this.commitReaderAnnotations(
       [...this.currentReader.annotations, ...additions],
-      touchedPages
+      pending.touchedPages
     );
   },
 
@@ -5338,52 +5442,37 @@ const app = {
     if (redo) redo.disabled = !this.readerRedoStack.length;
   },
 
-  toggleHighlightMode() {
-    this.highlightMode = !this.highlightMode;
-    this.updateHighlightToggle();
-  },
-
-  updateHighlightToggle() {
-    const button = document.getElementById('highlight-toggle');
-    if (!button) return;
-    button.textContent = this.highlightMode ? '退出高亮' : '高亮标注';
-    button.classList.toggle('btn-primary', this.highlightMode);
-    button.classList.toggle('btn-secondary', !this.highlightMode);
-  },
-
-  setHighlightColor(color) {
-    if (!HIGHLIGHT_COLORS.includes(color)) return;
-    this.highlightColor = color;
-    document.querySelectorAll('.highlight-swatch').forEach(button => {
-      button.classList.toggle('active', button.style.backgroundColor === this.hexToRgb(color));
-    });
-  },
-
-  hexToRgb(hex) {
-    const value = hex.replace('#', '');
-    const r = parseInt(value.slice(0, 2), 16);
-    const g = parseInt(value.slice(2, 4), 16);
-    const b = parseInt(value.slice(4, 6), 16);
-    return `rgb(${r}, ${g}, ${b})`;
-  },
-
   updateReaderScaleDisplay() {
     const display = document.getElementById('reader-scale-display');
     if (display) display.textContent = `${Math.round(this.currentPdfScale * 100)}%`;
   },
 
   getReaderScrollAnchor() {
+    return this.getReaderZoomAnchor();
+  },
+
+  getReaderZoomAnchor(clientX = null, clientY = null) {
     const scroll = document.getElementById('pdf-scroll');
     if (!scroll) return null;
-    const centerY = scroll.scrollTop + scroll.clientHeight / 2;
-    const centerX = scroll.scrollLeft + scroll.clientWidth / 2;
+    const scrollRect = scroll.getBoundingClientRect();
+    const viewportX = Number.isFinite(clientX) ? clientX - scrollRect.left : scroll.clientWidth / 2;
+    const viewportY = Number.isFinite(clientY) ? clientY - scrollRect.top : scroll.clientHeight / 2;
+    const contentX = scroll.scrollLeft + viewportX;
+    const contentY = scroll.scrollTop + viewportY;
     const pages = Array.from(scroll.querySelectorAll('.pdf-page'));
-    const pageEl = pages.find(page => centerY >= page.offsetTop && centerY <= page.offsetTop + page.offsetHeight) || pages[0];
+    const pageEl = pages.find(page => (
+      contentY >= page.offsetTop
+      && contentY <= page.offsetTop + page.offsetHeight
+      && contentX >= page.offsetLeft
+      && contentX <= page.offsetLeft + page.offsetWidth
+    )) || pages.find(page => contentY >= page.offsetTop && contentY <= page.offsetTop + page.offsetHeight) || pages[0];
     if (!pageEl) return null;
     return {
       page: Number(pageEl.dataset.page),
-      xRatio: pageEl.offsetWidth ? (centerX - pageEl.offsetLeft) / pageEl.offsetWidth : 0,
-      yRatio: pageEl.offsetHeight ? (centerY - pageEl.offsetTop) / pageEl.offsetHeight : 0
+      xRatio: pageEl.offsetWidth ? (contentX - pageEl.offsetLeft) / pageEl.offsetWidth : 0.5,
+      yRatio: pageEl.offsetHeight ? (contentY - pageEl.offsetTop) / pageEl.offsetHeight : 0.5,
+      viewportX,
+      viewportY
     };
   },
 
@@ -5392,16 +5481,74 @@ const app = {
     const scroll = document.getElementById('pdf-scroll');
     const pageEl = document.querySelector(`.pdf-page[data-page="${anchor.page}"]`);
     if (!scroll || !pageEl) return;
-    scroll.scrollTop = Math.max(0, pageEl.offsetTop + pageEl.offsetHeight * anchor.yRatio - scroll.clientHeight / 2);
-    scroll.scrollLeft = Math.max(0, pageEl.offsetLeft + pageEl.offsetWidth * anchor.xRatio - scroll.clientWidth / 2);
+    const viewportX = Number.isFinite(anchor.viewportX) ? anchor.viewportX : scroll.clientWidth / 2;
+    const viewportY = Number.isFinite(anchor.viewportY) ? anchor.viewportY : scroll.clientHeight / 2;
+    scroll.scrollTop = Math.max(0, pageEl.offsetTop + pageEl.offsetHeight * anchor.yRatio - viewportY);
+    scroll.scrollLeft = Math.max(0, pageEl.offsetLeft + pageEl.offsetWidth * anchor.xRatio - viewportX);
   },
 
   async zoomReaderPdf(direction) {
     if (!this.currentPdfDoc) return;
     const next = Math.max(0.45, Math.min(4, this.currentPdfScale + direction * 0.15));
     if (Math.abs(next - this.currentPdfScale) < 0.01) return;
+    const anchor = this.getReaderZoomAnchor();
     this.currentPdfScale = next;
-    await this.renderCurrentPdfPages({ preserveAnchor: true });
+    await this.renderCurrentPdfPages({ anchor });
+  },
+
+  async zoomReaderPdfAt(direction, clientX, clientY, step = 0.15) {
+    if (!this.currentPdfDoc) return;
+    const next = Math.max(0.45, Math.min(4, this.currentPdfScale + direction * step));
+    if (Math.abs(next - this.currentPdfScale) < 0.01) return;
+    const anchor = this.getReaderZoomAnchor(clientX, clientY);
+    this.currentPdfScale = next;
+    await this.renderCurrentPdfPages({ anchor });
+  },
+
+  queueReaderZoomAt(direction, clientX, clientY, step = 0.12) {
+    if (!this.currentPdfDoc) return;
+    const next = Math.max(0.45, Math.min(4, this.currentPdfScale + direction * step));
+    if (Math.abs(next - this.currentPdfScale) < 0.01) return;
+    this.readerZoomAnchor = this.getReaderZoomAnchor(clientX, clientY);
+    this.currentPdfScale = next;
+    this.updateReaderScaleDisplay();
+    clearTimeout(this.readerZoomTimer);
+    this.readerZoomTimer = setTimeout(async () => {
+      const anchor = this.readerZoomAnchor;
+      this.readerZoomTimer = null;
+      await this.renderCurrentPdfPages({ anchor });
+    }, 80);
+  },
+
+  handleReaderWheel(event) {
+    if (!this.currentPdfDoc || this.readerView !== 'pdf') return;
+    if (!event.ctrlKey && !event.metaKey) return;
+    event.preventDefault();
+    this.hideHighlightPopover(false);
+    const direction = event.deltaY < 0 ? 1 : -1;
+    const step = Math.min(0.24, Math.max(0.08, Math.abs(event.deltaY) / 650));
+    this.queueReaderZoomAt(direction, event.clientX, event.clientY, step);
+  },
+
+  startReaderGestureZoom(event) {
+    if (!this.currentPdfDoc || this.readerView !== 'pdf') return;
+    event.preventDefault();
+    this.readerGestureScaleStart = this.currentPdfScale;
+    this.readerGestureAnchor = this.getReaderZoomAnchor(event.clientX, event.clientY);
+  },
+
+  changeReaderGestureZoom(event) {
+    if (!this.currentPdfDoc || this.readerView !== 'pdf') return;
+    event.preventDefault();
+    const next = Math.max(0.45, Math.min(4, this.readerGestureScaleStart * (event.scale || 1)));
+    if (Math.abs(next - this.currentPdfScale) < 0.01) return;
+    this.currentPdfScale = next;
+    this.updateReaderScaleDisplay();
+    clearTimeout(this.readerZoomTimer);
+    this.readerZoomTimer = setTimeout(async () => {
+      this.readerZoomTimer = null;
+      await this.renderCurrentPdfPages({ anchor: this.readerGestureAnchor });
+    }, 80);
   },
 
   async fitReaderPdf() {
@@ -5420,29 +5567,13 @@ const app = {
     scroll.scrollBy({ left, top, behavior: 'smooth' });
   },
 
-  toggleReaderPanMode() {
-    this.readerPanMode = !this.readerPanMode;
-    this.updateReaderPanToggle();
-  },
-
-  updateReaderPanToggle() {
-    const button = document.getElementById('pan-toggle');
-    const scroll = document.getElementById('pdf-scroll');
-    if (button) {
-      button.textContent = this.readerPanMode ? '退出拖动' : '拖动';
-      button.classList.toggle('btn-primary', this.readerPanMode);
-      button.classList.toggle('btn-secondary', !this.readerPanMode);
-    }
-    scroll?.classList.toggle('pan-mode', this.readerPanMode);
-  },
-
   startReaderPan(event) {
     const readerOpen = document.getElementById('reader-overlay').classList.contains('open');
     if (!readerOpen || this.readerView !== 'pdf' || event.button !== 0) return;
-    if (!this.readerPanMode && event.pointerType === 'mouse') return;
-    if (this.highlightMode || event.target.closest?.('button, a, input, .pdf-highlight, .text-layer span')) return;
+    if (event.target.closest?.('button, a, input, .pdf-highlight, .text-layer span')) return;
     const scroll = document.getElementById('pdf-scroll');
     event.preventDefault();
+    this.hideHighlightPopover(false);
     try {
       scroll.setPointerCapture?.(event.pointerId);
     } catch (_) {}
@@ -5605,7 +5736,7 @@ const app = {
     body?.classList.toggle('mode-record', this.readerView === 'record');
     body?.classList.toggle('mode-pdf', this.readerView !== 'record');
     const toggle = document.getElementById('reader-view-toggle');
-    if (toggle) toggle.textContent = this.readerView === 'record' ? '返回PDF' : '查看文献记录';
+    if (toggle) toggle.textContent = this.readerView === 'record' ? '返回PDF' : '文献详情';
     const fitButton = document.getElementById('fit-reader-button');
     if (fitButton) fitButton.style.display = this.readerView === 'record' ? 'none' : '';
   },
@@ -5613,19 +5744,21 @@ const app = {
   closePdfReader() {
     document.getElementById('reader-overlay').classList.remove('open');
     const scroll = document.getElementById('pdf-scroll');
-    scroll.classList.remove('panning', 'pan-mode');
+    scroll.classList.remove('panning');
     scroll.innerHTML = '';
     this.currentReader = null;
     this.currentPdfDoc = null;
     this.currentPdfTextPages = [];
-    this.highlightDraft = null;
-    this.highlightMode = false;
-    this.readerPanMode = false;
     this.readerPanState = null;
+    this.readerOutlineItems = [];
+    this.pendingHighlightSelection = null;
+    this.readerZoomAnchor = null;
+    clearTimeout(this.readerZoomTimer);
+    this.readerZoomTimer = null;
     this.readerUndoStack = [];
     this.readerRedoStack = [];
     this.lastSelectionHighlightKey = '';
-    this.updateReaderPanToggle();
+    this.hideHighlightPopover(true);
     this.updateReaderHistoryButtons();
     this.setReaderView('pdf');
   },

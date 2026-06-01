@@ -2301,8 +2301,10 @@
         <input type="search" id="search-input" name="paper-search-query" placeholder="搜索标题、作者、方向、定位..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" value="">
       </div>
       <select class="sort-select" id="sort-select">
+        <option value="created-desc">按加入时间新→旧</option>
         <option value="date-desc">按发表时间新→旧</option>
         <option value="updated-desc">按最近更新</option>
+        <option value="created-asc">按加入时间旧→新</option>
         <option value="date-asc">按发表时间旧→新</option>
         <option value="citation-desc">按引用量高→低</option>
         <option value="score-desc">按综合评分高→低</option>
@@ -3480,6 +3482,8 @@ const app = {
     const sort = document.getElementById('sort-select').value;
     list.sort((a, b) => {
       switch(sort) {
+        case 'created-desc': return this.getJoinedTime(b).localeCompare(this.getJoinedTime(a));
+        case 'created-asc': return this.getJoinedTime(a).localeCompare(this.getJoinedTime(b));
         case 'updated-desc': return (b.updated_at||'').localeCompare(a.updated_at||'');
         case 'date-desc': return getPublicationDate(b).localeCompare(getPublicationDate(a));
         case 'date-asc': return getPublicationDate(a).localeCompare(getPublicationDate(b));
@@ -3517,6 +3521,8 @@ const app = {
     const sort = document.getElementById('sort-select').value;
     list.sort((a, b) => {
       switch(sort) {
+        case 'created-desc': return this.getJoinedTime(b).localeCompare(this.getJoinedTime(a));
+        case 'created-asc': return this.getJoinedTime(a).localeCompare(this.getJoinedTime(b));
         case 'date-desc': return getPublicationDate(b).localeCompare(getPublicationDate(a));
         case 'date-asc': return getPublicationDate(a).localeCompare(getPublicationDate(b));
         case 'citation-desc': return (parseInt(b.citation_count, 10) || 0) - (parseInt(a.citation_count, 10) || 0);
@@ -3529,6 +3535,10 @@ const app = {
       }
     });
     return list;
+  },
+
+  getJoinedTime(p) {
+    return p?.created_at || p?.updated_at || p?.readDate || '';
   },
 
   render() {

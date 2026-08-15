@@ -220,11 +220,9 @@ def get_user(conn, username):
 def inject_favorites(conn, papers, username):
     if not username or not papers:
         return papers
-    paper_ids = [p['id'] for p in papers]
-    placeholders = ','.join(['?'] * len(paper_ids))
     rows = conn.execute(
-        f'SELECT paper_id FROM favorites WHERE user_id = ? AND paper_id IN ({placeholders})',
-        (username, *paper_ids)
+        'SELECT paper_id FROM favorites WHERE user_id = ?',
+        (username,)
     ).fetchall()
     fav_set = {r['paper_id'] for r in rows}
     for p in papers:

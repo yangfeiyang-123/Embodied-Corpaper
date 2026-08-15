@@ -19,6 +19,7 @@ const corsHeaders = {
 
 const PDF_SCOPES = new Set(['paper', 'todo']);
 const MAX_PDF_BYTES = 60 * 1024 * 1024;
+const D1_BATCH_SIZE = 50;
 
 export default {
   async fetch(request, env) {
@@ -177,11 +178,9 @@ async function listPapers(request, env) {
   const papers = normalizeRows(result.results);
   const username = request.headers.get('X-User-Name') || '';
   if (username && papers.length) {
-    const paperIds = papers.map((p) => p.id);
-    const placeholders = paperIds.map(() => '?').join(', ');
     const favRows = await env.DB.prepare(
-      `SELECT paper_id FROM favorites WHERE user_id = ? AND paper_id IN (${placeholders})`
-    ).bind(username, ...paperIds).all();
+      'SELECT paper_id FROM favorites WHERE user_id = ?'
+    ).bind(username).all();
     const favSet = new Set((favRows.results || []).map((r) => r.paper_id));
     for (const p of papers) {
       p.favorite = favSet.has(p.id) ? '是' : '否';
@@ -823,7 +822,9 @@ async function importPapers(request, env) {
   }
 
   if (statements.length > 0) {
-    await env.DB.batch(statements);
+    for (let offset = 0; offset < statements.length; offset += D1_BATCH_SIZE) {
+      await env.DB.batch(statements.slice(offset, offset + D1_BATCH_SIZE));
+    }
   }
 
   return json({
@@ -1134,3 +1135,5 @@ function withCors(response) {
     headers
   });
 }
+
+export { importPapers, listPapers };

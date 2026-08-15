@@ -814,6 +814,23 @@
   .empty-state svg { margin-bottom: 16px; opacity: 0.3; }
   .empty-state h3 { font-size: 16px; margin-bottom: 8px; color: var(--text); }
 
+  .load-error-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+    padding: 12px 14px;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    background: #fff7f7;
+    color: #991b1b;
+    font-size: 13px;
+  }
+  .load-error-banner strong { display: block; margin-bottom: 2px; color: #7f1d1d; }
+  .load-error-banner .btn { flex: 0 0 auto; margin-left: auto; }
+
   /* Filter Bar */
   .filter-bar {
     display: flex;
@@ -2856,6 +2873,7 @@ async function apiDelete(path) {
 const app = {
   papers: [],
   todos: [],
+  paperLoadError: '',
   currentView: 'dashboard',
   currentCategory: '',
   currentStatus: '',
@@ -2921,10 +2939,10 @@ const app = {
     try {
       const data = await apiGet('/api/papers');
       this.papers = data.papers || [];
+      this.paperLoadError = '';
     } catch(e) {
       console.error('Failed to load papers:', e);
-      // Fallback: show empty state, user can input password if needed
-      this.papers = [];
+      this.paperLoadError = '文献加载失败，请重新加载。数据库中的记录未被删除。';
     }
     try {
       const data = await apiGet('/api/todos');
@@ -3557,10 +3575,25 @@ const app = {
     } else if (this.currentView === 'ppt') {
       html = this.renderPPT();
     }
+    if (this.paperLoadError) {
+      html = `
+        <div class="load-error-banner" role="alert">
+          <div><strong>暂时无法加载文献</strong>${this.escape(this.paperLoadError)}</div>
+          <button class="btn btn-secondary" onclick="app.retryLoadData()">重新加载</button>
+        </div>
+      ` + html;
+    }
     content.innerHTML = html;
     content.classList.remove('page-enter');
     void content.offsetWidth;
     content.classList.add('page-enter');
+  },
+
+  async retryLoadData() {
+    await this.loadData();
+    this.renderSidebarNav();
+    this.updateNavCounts();
+    this.render();
   },
 
   renderFavorites() {
